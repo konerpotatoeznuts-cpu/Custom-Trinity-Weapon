@@ -33,6 +33,9 @@ Abilities only work on items given with `/weapon give` (they carry a hidden tag)
 | Great Axe | netherite axe | 11 damage, slow, Slowness I. Right-click: throw. Hits a block: grapple (20s). Hits a mob/player: pulled to you, 3.5 hearts (25s) |
 | Sea Truncheon | trident | Hidden Sharpness 5, Impaling 5, Unbreaking 5, Mending. Hold right-click and release like a vanilla trident throw: riptide dash anywhere (no cooldown); hitting a mob does a mace-style smash (stronger with Strength). Quick tap right-click: summon rain (20% thunderstorm, 10 min). Sneak-charge + right-click: tsunami (10s charge; 15s rain, 25s lake, 35s both). Dolphin's Grace II in water. Dead in desert/savanna/badlands |
 | Sonic's Shoes | netherite boots (worn) | Run to build momentum (faster downhill), auto-step blocks. Fast enough: run on water, up walls, across ceilings. Sneak while running fast = roll. Jump = spin ball, land on a mob to hurt it and bounce. Sneak + right-click (up to 5) then stop sneaking = Spin Dash |
+| Smoke Grenade | egg | Right-click: full throw. Sneak + right-click: low throw. Counter-Strike 2 throw speed, gravity and bounces; pops when it stops into a smoke cloud that fills the room (not through walls), lasts 18s, puts out fires. Arrows, bullets, throwables, explosions and every weapon ability punch holes in it |
+| AK-47 | crossbow | Hold right-click: full auto (600 RPM, 30 rounds), CS2 spray pattern, headshots x4, wallbang through thin blocks. F / right-click empty = reload (arrows) |
+| Rocket Launcher | crossbow | Right-click: fire a rocket. CS2 HE-grenade blast (8.75 blocks, no damage through walls, hurts you too). F = reload (firework rocket) |
 
 The white bar in the hotbar is the normal item cooldown (like Ender Pearls). Weapons with two abilities only show it when
 both are cooling down. Medusa's Revolver shows its gaze cooldown on the action bar.
