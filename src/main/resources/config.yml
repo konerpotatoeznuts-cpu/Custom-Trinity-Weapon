@@ -1,1 +1,314 @@
+# CustomWeapons configuration. Use /weapon reload after editing.
+# Times are in seconds unless stated. "hearts" = 2 health points each.
+# Existing weapons keep their lore text; give new ones after changing numbers.
 
+permissions:
+  # false = EVERY player can use the abilities of weapons they hold (weapons are only obtained with /weapon give).
+  # true  = only players with the permission customweapons.use (given by default to everyone unless you remove it).
+  require-use-permission: false
+
+worldguard:
+  enabled: true
+  # Players can never be hurt by abilities where the WorldGuard "pvp" flag is DENY.
+  # false = abilities still work there (e.g. on mobs); true = abilities are completely disabled in no-pvp areas.
+  block-abilities-in-no-pvp: false
+
+damage:
+  ability-multiplier: 2.5        # every ability's damage is multiplied by this
+  armor-piercing-share: 0.6      # this share of ability damage ignores armor (full netherite no longer tickles)
+  melee-pierce-share: 0.5        # weapon swings add this share of their damage as armor-piercing damage
+  strength-multiplier-per-level: 0.5  # Strength I = x1.5, II = x2 on: halberd spin, whip, revolver, great axe, excalibur slash + uppercut, trident smash
+
+weapons:
+  durandal:
+    material: IRON_SWORD
+    attack-damage: 7.0          # total damage, 7.0 = diamond sword
+    cooldown: 15
+    lifesteal-hearts: 2
+    lightning-damage: 5.0
+    # Heavenly Beam (right-click)
+    beam-cooldown: 60
+    beam-range: 100             # how far you can aim it
+    beam-radius: 10             # radius of the beam (damage, stun and block breaking)
+    beam-seconds: 5
+    beam-damage: 2.0            # per tick of damage; 2.0 = 1 heart
+    beam-damage-interval: 1.0   # seconds between damage ticks (so 1 heart per second)
+    beam-height: 70             # visual height of the beam above the impact point
+    beam-max-hardness: 30       # blocks harder than this (obsidian is 50) are not broken
+    beam-max-blocks: 6000       # safety cap per beam
+    beam-blocks-per-tick: 120   # how fast the blocks above are cleared (lower = less lag)
+
+  eldritch_mace:
+    material: MACE
+    proc-chance: 0.40           # chance on hit for the shockwave
+    proc-radius: 4.0
+    smash-min-fall: 1.5         # blocks fallen for a hit to count as a smash attack
+    crater: true                # terrain damage on a successful shockwave
+    crater-radius: 2.5
+    crater-max-blocks: 40
+    crater-max-hardness: 30
+    proc-damage: 2.0            # 2.0 = 1 heart
+    dash-cooldown: 20
+    dash-power: 2.4
+    pull-cooldown: 60
+    pull-radius: 12.0
+    pull-ground: 0.7
+    pull-air: 1.6
+    no-fall-seconds: 6          # fall damage immunity after a dash
+
+  halberd_of_despair:
+    material: NETHERITE_SPEAR
+    cooldown: 40
+    stun-seconds: 1.5
+    minions: 4
+    minion-lifetime: 20         # seconds before the wither skeletons vanish
+    shield-disable-seconds: 5   # hits disable a blocking shield like an axe
+    # Reaping Spin (sneak + right-click)
+    spin-cooldown: 30
+    spin-seconds: 5
+    spin-radius: 4.5
+    spin-damage: 2.0            # per damage tick; 2.0 = 1 heart
+    spin-damage-interval: 1.0   # seconds between damage ticks
+    spin-wither-seconds: 2.5    # Wither applied each tick, refreshed
+    spin-pull: 0.10             # how hard it drags entities in
+
+  prismatic_blade:
+    material: DIAMOND_SWORD
+    cooldown: 15
+    charge-seconds: 2.0         # hold sneak this long, then right-click
+    radius: 10.0
+    blind-seconds: 6            # mobs (and Bedrock players): blindness length
+    overlay-seconds: 8.0        # total flash time (holds white, then fades out). Java and Bedrock
+    bedrock-white-flash: true   # Bedrock players get a real white screen fade (needs Geyser); false = Blindness only
+    bedrock-blind-seconds: 2.5  # used only if the white fade is unavailable
+    attack-damage: 9.0          # heavier than before (was a diamond sword)
+    attack-speed-modifier: -3.0 # slower swings (diamond sword is -2.4)
+    slowness-level: 2           # passive while held (2 = Slowness II, 0 = off)
+    immobilize-seconds: 8.0     # flashed entities are very slow and cannot jump this long
+    immobilize-slowness-level: 3 # 3 = Slowness III
+
+  warden_whip:
+    material: WOODEN_SWORD
+    cooldown: 30
+    range: 16.0
+    damage: 10.0                # ignores armor, like the Warden
+    attack-range: 4.5           # melee reach in blocks (secret Knockback II is built in)
+
+  medusas_revolver:
+    material: CROSSBOW
+    cooldown: 20                # cooldown of the poison / stone effect
+    magazine: 6
+    # Reload time depends on how many bullets are loaded (limited by the arrows you carry)
+    reload-times:
+      1: 1.0
+      2: 2.4
+      3: 3.0
+      4: 3.8
+      5: 4.5
+      6: 5.0
+    fire-delay-ticks: 8
+    bullet-speed: 3.0           # speed 3.0 with base 2.0 = about 3 hearts to an unarmored target
+    bullet-damage: 4.0
+    recoil: 0.45
+    camera-kick: 3.5            # degrees the view jerks upward, 0 = off
+    stone-seconds: 3
+    poison-seconds: 8
+    poison-level: 2             # 2 = Poison II (strong)
+
+  miners_handy_tool:
+    material: DIAMOND_PICKAXE
+    mining-speed: 8.0           # diamond pickaxe speed, applied to every block
+    vein-max-blocks: 64
+    vein-require-sneak: false
+    autosmelt: true
+    # Extra block types that should also be vein mined (ores are always included)
+    extra-vein-blocks: []
+
+  excalibur:
+    material: IRON_SWORD
+    cooldown: 15
+    dash-distance: 7.0
+    damage: 6.0                 # dash damage; 6.0 = 3 hearts
+    # Rising Slash (right-click)
+    uppercut-cooldown: 15
+    uppercut-range: 2.0
+    uppercut-angle: 120         # width of the fan in degrees
+    uppercut-damage: 6.0        # 6.0 = 3 hearts
+    uppercut-launch: 1.0        # how high targets are launched
+
+  fantasy_tamer:
+    material: STICK
+    max-tamed: 30               # per player
+    max-clicks: 15              # most right-clicks any mob can need
+    # Taming is a timing minigame: HIT a wild mob with the Fantasy Tamer to start it. One round per "click needed".
+    # A ring shrinks onto a floating circle and you hit/tap the mob
+    # in the final stretch. Clicking early, missing (Java) or running out of time costs a life; no lives = it breaks free.
+    qte-seconds: 1.5            # time per round (a little shorter for tougher mobs)
+    qte-min-seconds: 0.9
+    qte-window: 0.4             # last part of the round (0-1) where a click counts
+    qte-lives: 3
+    qte-radius: 0.35            # size of the circle in blocks
+    qte-approach-radius: 1.3
+    qte-aim-java: false         # true = Java players must also look at the circle (hitting the mob already means looking at it)
+    qte-aim-tolerance: 0.3
+    qte-retry-seconds: 3        # wait after failing before trying again
+    qte-max-distance: 12        # walking away cancels it
+    # Rounds needed = 1 (passive) or 2 (hostile) + 1 per health-per-click max health, up to max-clicks
+    health-per-click: 20        # cow 1+0=1... zombie 2+1=3, iron golem 1+5=6, wither/warden hit the cap
+    recall-cooldown: 60
+    recall-radius: 20
+    charge-base-seconds: 2.0    # charge time = base + per-mob * tamed mobs
+    charge-per-mob-seconds: 0.4
+    charge-max-seconds: 15
+    follow-distance: 7.0        # tamed mobs walk back to you when further than this
+    assist-seconds: 15          # how long they keep fighting whatever you hit / what hit you
+    assist-range: 40
+    passive-attack-damage: 4.0  # damage dealt by mobs that normally cannot attack (cows, pigs...)
+
+  great_axe:
+    material: NETHERITE_AXE
+    attack-damage: 11.0
+    attack-speed-modifier: -3.3 # slower than a normal axe swing
+    slowness-level: 1           # passive while held
+    throw-range: 30
+    throw-speed: 2.0            # blocks per tick
+    hit-damage: 7.0             # 7.0 = 3.5 hearts
+    hit-cooldown: 25            # when the axe hits a mob or player
+    grapple-cooldown: 20        # when the axe hits a block and pulls you
+    grapple-speed: 1.9
+    miss-cooldown: 5            # when the axe hits nothing at all
+
+  sea_truncheon:
+    material: TRIDENT
+    # Vanilla trident damage and speed. Hidden enchants: Sharpness 5, Impaling 5, Unbreaking 5, Mending.
+    disabled-biomes: [desert, savanna, badlands, mesa] # powers don't work in biomes whose name contains these
+    riptide-speed: 1.7
+    riptide-ticks: 12
+    riptide-smash-damage: 14.0    # hitting a mob mid-riptide
+    smash-base-damage: 5.0        # melee smash bonus (like a mace, grows when falling)
+    smash-per-fall-block: 2.0
+    smash-max-fall-bonus: 30.0
+    smash-cooldown: 0.6
+    rain-cooldown: 600            # right-click tap (not holding): summon rain
+    rain-seconds: 300
+    rain-thunder-chance: 0.2      # 20% of the time it is a thunderstorm
+    tsunami-cooldown: 45
+    min-charge-seconds: 1.0
+    charge-max-seconds: 10        # normal
+    charge-max-rain: 15           # raining (open sky)
+    charge-max-lake: 25           # standing in a lake-sized body of water
+    charge-max-both: 35           # both
+    damage-mult-rain: 1.5
+    damage-mult-lake: 2.0
+    damage-mult-both: 3.0
+    lake-min-blocks: 250          # connected water blocks that count as a lake
+    lake-search-radius: 24
+    wave-base-half-width: 3
+    wave-width-per-second: 0.9
+    wave-max-half-width: 22
+    wave-base-height: 2
+    wave-height-per-second: 0.35
+    wave-max-height: 9
+    wave-base-range: 14
+    wave-range-per-second: 3.0
+    wave-max-range: 100
+    wave-base-damage: 1.5         # damage every 0.5s while caught in the wave
+    wave-damage-per-second: 0.35  # added per second of charge, then multiplied by the tier
+
+  sonic_shoes:
+    material: NETHERITE_BOOTS     # unbreakable
+    step-height: 1.0              # climbs full blocks automatically, like a horse (vanilla is 0.6)
+    top-speed: 0.9                # blocks per tick when running flat out (sprinting is about 0.28)
+    accel: 0.009                  # speed gained per tick while sprinting
+    stick-to-floor: 1             # 1 = glued to slopes, 0 = off
+    stick-max-drop: 1.7           # drops bigger than this count as a ledge (you go airborne)
+    release-decay: 0.9            # speed kept each tick after you let go of the keys
+    coast-decay: 0.78             # let go of the keys: momentum lost per tick
+    over-top-decay: 0.995         # speed above top speed (from slopes) fades at this rate
+    slope-gain: 0.02              # going down a slope
+    slope-loss: 0.015             # going up a slope
+    roll-min-speed: 0.55          # sneak while running at least this fast to roll
+    roll-friction-mult: 0.9975   # closer to 1 = keeps rolling longer
+    roll-friction-const: 0.0012
+    roll-slope-gain: 0.06
+    roll-slope-loss: 0.05
+    roll-damage: 5.0              # damage to anything you crash into while rolling (scales with speed)
+    jump-damage: 8.0              # landing on a mob with a jump spin
+    bounce: 0.7
+    max-clicks: 5                 # spin dash revs
+    spin-dash-base: 1.2           # launch speed with 1 rev
+    spin-dash-per-click: 0.2      # added per extra rev (5 revs = 2.0 blocks/tick)
+    charge-decay-seconds: 3.5     # lose one rev when idle this long
+    water-min-speed: 0.5          # run on water above this speed
+    wall-min-speed: 0.6           # run up walls above this speed
+    wall-hold-min: 0.28           # below this speed you fall off
+    wall-decay: 0.978
+    ceiling-decay: 0.99
+    wall-max-ticks: 0             # 0 = no time limit (needs allow-flight=true; without it vanilla kicks floaters after 80 ticks, so use 60)
+    trail-min-speed: 0.6          # blocks per tick: the speed trail appears above this
+    electric-min-speed: 0.75      # sparks appear above this
+
+  smoke_grenade:
+    material: EGG
+    cooldown: 1.0                 # seconds between throws
+    # Counter-Strike 2 numbers (Source units: 40 units = 1 block)
+    max-speed: 750                # units per second, a full throw looking up
+    high-strength: 1.0            # right-click (CS2 left click)
+    low-strength: 0.0             # sneak + right-click (CS2 right click): 30% of the speed
+    inherit-velocity: 1.25        # your own movement adds this much
+    gravity-scale: 0.4            # CS2 grenades fall at 0.4 of normal gravity
+    elasticity: 0.45              # every bounce keeps this much speed
+    roll-friction: 0.85           # per tick while rolling on the floor
+    max-flight-seconds: 20
+    smoke-radius: 3.6             # blocks (144 units)
+    smoke-seconds: 18
+    bloom-ticks: 20               # how fast the cloud expands
+    particle-density: 0.1         # lower = fewer particles (easier on phones), thinner smoke
+    max-voxels: 420
+    projectile-hole-radius: 1.1   # arrows, bullets, tridents, eggs... cut a hole this wide as they fly through the smoke
+    hole-seconds: 3.0             # how long a hole takes to fill in
+    explosion-hole-radius: 5.0    # TNT, creepers, wind charges (a bit smaller) clear this much smoke
+    explosion-hole-seconds: 6.0
+
+  ak47:
+    material: CROSSBOW
+    # Counter-Strike 2 numbers (Source units: 40 units = 1 block)
+    damage: 36                    # CS2 hp per bullet to the chest
+    damage-scale: 0.3             # CS2 has 100 hp, Minecraft 20: 0.3 = 10.8 per chest hit, 43 per headshot
+    headshot-multiplier: 4.0      # chest x1, stomach x1.25, legs x0.75 are built in
+    range-modifier: 0.98          # damage kept per 500 units (12.5 blocks)
+    range: 200                    # blocks
+    magazine: 30
+    reload-seconds: 2.5
+    ammo-item: ARROW              # reserve ammo taken from the inventory
+    infinite-reserve: false       # true = never run out of reserve ammo
+    spray-reset-ms: 400           # pause this long and the spray pattern starts over
+    recoil: 1.0                   # 0 = no view kick, 2 = twice as much
+    inaccuracy: 1.0               # 0 = laser beam
+    slow: 0.14                    # held movement speed loss (CS2: 215 vs 250 units/s)
+    wallbang: true
+    max-penetrations: 2
+    penetration-damage: 0.6       # damage kept after each thin wall
+    tracer-length: 40
+  rocket_launcher:
+    material: CROSSBOW
+    # CS2 has no launcher, so the blast uses the CS2 HE grenade: 98 damage, 350 units (8.75 blocks), linear falloff
+    damage: 98
+    damage-scale: 0.35
+    blast-radius: 8.75
+    self-damage: 0.5              # the shooter takes this share (CS2 HE: 1.0)
+    knockback: 1.5                # rocket jumps!
+    break-blocks: false           # true = the explosion also breaks blocks (block-power)
+    block-power: 3.0
+    magazine: 1
+    reload-seconds: 3.5
+    ammo-item: FIREWORK_ROCKET
+    infinite-reserve: false
+    fire-delay: 0.8
+    start-speed: 0.5              # blocks per tick when it leaves the tube
+    max-speed: 2.2                # blocks per tick once the motor is lit (44 blocks/s)
+    motor-ticks: 8
+    drop: 0.0015                  # sag over distance
+    fuse-seconds: 8
+    recoil: 0.5
+    camera-kick: 5.0
