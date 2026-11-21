@@ -277,6 +277,13 @@ final class WeaponItems {
                 l.add(line("Gotta Go Fast", "Run to build momentum (faster downhill, slower uphill). Auto-steps blocks. At speed: run on water, up walls and across ceilings, until you slow down."));
                 l.add(line("Spin Dash", "Sneak and right-click (hold any item) to rev, up to 5 times. Stop sneaking to launch. Sneak while running fast to roll. Jumping spins: land on a mob to hurt it and bounce."));
             }
+            case CRYO_TEMPEST -> {
+                l.add(line("Frost Arrows", "Every arrow is icy: it slows and freezes what it hits."));
+                l.add(line("Arrow Rain", "Shoot while sneaking (aim up): the arrow flies on. Let go of sneak and frost arrows rain where the arrow is. "
+                        + fmt(n(t, "rain-cooldown", 25)) + "s cooldown."));
+                l.add(line("Pilot", "Shoot, then sneak twice while the arrow flies: you steer it where you look. Explodes on the first hit. A harder draw means faster, stronger, bigger blast and easier to turn. "
+                        + fmt(n(t, "pilot-cooldown", 12)) + "s cooldown."));
+            }
             case AK47 -> {
                 l.add(line("Full Auto", "Hold right-click: 600 rounds per minute, 30 round magazine. Counter-Strike 2 spray pattern: the first shots are accurate, then the gun climbs and sways. Moving and jumping spoil your aim."));
                 l.add(line("Hitgroups", "Headshots do 4x. Bullets go through thin things (glass, leaves, wood) for less damage. Reload: F or right-click when empty (uses arrows)."));

@@ -108,6 +108,7 @@ final class RocketLauncherAbility extends GunAbility {
         setAmmo(item, left);
         p.getInventory().setItemInMainHand(item);
         launch(p);
+        Animations.trigger(plugin, p, type(), "fire");
         status(p, left);
     }
 

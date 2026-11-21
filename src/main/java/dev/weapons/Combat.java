@@ -60,6 +60,9 @@ final class Combat {
      * fully enchanted netherite doesn't turn it into a tickle.
      */
     static void damage(LivingEntity target, double amount, DamageSource source) {
+        if (source.getCausingEntity() instanceof Player killer) {
+            Deaths.record(target, killer, Fx.currentWeapon());
+        }
         double total = amount * damageMult;
         double pierce = total * pierceShare;
         double normal = total - pierce;
@@ -80,6 +83,7 @@ final class Combat {
 
     /** Armor-ignoring (magic) damage credited to the same attacker. No multipliers. */
     static void pierce(LivingEntity target, double amount, Player source) {
+        Deaths.record(target, source, Fx.currentWeapon());
         boolean prev = internal;
         internal = true;
         try {

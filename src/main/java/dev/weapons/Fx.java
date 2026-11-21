@@ -47,7 +47,8 @@ final class Fx {
             java.util.Map.entry("SpinBall", WeaponType.SONIC_SHOES),
             java.util.Map.entry("SmokeGrenadeAbility", WeaponType.SMOKE_GRENADE),
             java.util.Map.entry("Ak47Ability", WeaponType.AK47),
-            java.util.Map.entry("RocketLauncherAbility", WeaponType.ROCKET_LAUNCHER));
+            java.util.Map.entry("RocketLauncherAbility", WeaponType.ROCKET_LAUNCHER),
+            java.util.Map.entry("CryoTempestAbility", WeaponType.CRYO_TEMPEST));
 
     private static WeaponType source(String className) {
         String n = className.substring(className.lastIndexOf('.') + 1);
@@ -59,6 +60,10 @@ final class Fx {
     }
 
     /** Which weapon is this effect from? Found from the calling class, so no ability code needs to pass it around. */
+    static WeaponType currentWeapon() {
+        return context();
+    }
+
     private static WeaponType context() {
         return StackWalker.getInstance().walk(frames -> frames.limit(14)
                 .map(f -> source(f.getClassName()))

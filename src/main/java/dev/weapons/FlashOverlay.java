@@ -79,21 +79,32 @@ final class FlashOverlay {
             // three times with its anchor guessed at the bottom, the middle and the top. Same white, same plane, so the
             // copies are invisible, but whichever guess is right (or close) leaves no gap.
             final float[] shifts = {-h / 2, 0f, h / 2};
-            Quaternionf none = new Quaternionf();
-            Quaternionf rotY = new Quaternionf().rotateY((float) (Math.PI / 2));
-            Quaternionf rotX = new Quaternionf().rotateX((float) (Math.PI / 2));
+            // A text background is only drawn from its FRONT (the +Z side). So every wall is turned to face the camera in
+            // the middle of the box. (Before, the walls ahead of / beside / under the player faced outward and were invisible
+            // from inside, which left a see-through hole in first person and in third person from behind.)
+            final double q = Math.PI / 2;
+            Quaternionf faceNeg = new Quaternionf();                  // wall at -Z, front already points to +Z (inward)
+            Quaternionf facePos = new Quaternionf().rotateY((float) Math.PI); // wall at +Z, front turned to -Z
+            Quaternionf faceMinusX = new Quaternionf().rotateY((float) q);     // wall at -X, front turned to +X
+            Quaternionf facePlusX = new Quaternionf().rotateY((float) -q);     // wall at +X, front turned to -X
+            Quaternionf ceiling = new Quaternionf().rotateX((float) q);        // wall at +Y, front turned down
+            Quaternionf floor = new Quaternionf().rotateX((float) -q);         // wall at -Y, front turned up
             List<Object[]> walls = new ArrayList<>();
             for (float sh : shifts) {
-                walls.add(new Object[]{none, new Vector3f(0, sh, d)});
-                walls.add(new Object[]{none, new Vector3f(0, sh, -d)});
-                walls.add(new Object[]{rotY, new Vector3f(d, sh, 0)});
-                walls.add(new Object[]{rotY, new Vector3f(-d, sh, 0)});
-                walls.add(new Object[]{rotX, new Vector3f(0, d, sh)});
-                walls.add(new Object[]{rotX, new Vector3f(0, -d, sh)});
+                walls.add(new Object[]{facePos, new Vector3f(0, sh, d)});
+                walls.add(new Object[]{faceNeg, new Vector3f(0, sh, -d)});
+                walls.add(new Object[]{facePlusX, new Vector3f(d, sh, 0)});
+                walls.add(new Object[]{faceMinusX, new Vector3f(-d, sh, 0)});
+                walls.add(new Object[]{ceiling, new Vector3f(0, d, sh)});
+                walls.add(new Object[]{floor, new Vector3f(0, -d, sh)});
             }
             for (Object[] w : walls) {
-                final Quaternionf rot = (Quaternionf) w[0];
+                Quaternionf rot0 = (Quaternionf) w[0];
                 final Vector3f trans = (Vector3f) w[1];
+                // A text display's background is only drawn from its front side. Turn every wall to face the camera,
+                // otherwise the three walls that face outwards are invisible (that was the missing corner of the screen).
+                Vector3f normal = new Vector3f(0, 0, 1).rotate(rot0);
+                final Quaternionf rot = normal.dot((Vector3f) w[2]) > 0 ? new Quaternionf(rot0).rotateY((float) Math.PI) : rot0;
                 TextDisplay td = p.getWorld().spawn(p.getEyeLocation(), TextDisplay.class, e -> {
                     e.setText(" ".repeat(24));
                     e.setBackgroundColor(Color.fromARGB(255, 255, 255, 255));

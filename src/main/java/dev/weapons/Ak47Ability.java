@@ -195,6 +195,7 @@ final class Ak47Ability extends GunAbility {
         setAmmo(item, ammo);
         p.getInventory().setItemInMainHand(item);
         s.lastShotTick = nowTick;
+        Animations.trigger(plugin, p, type(), "fire");
 
         long now = System.currentTimeMillis();
         if (now - s.lastShotMs > num("spray-reset-ms", 400)) {
@@ -209,7 +210,7 @@ final class Ak47Ability extends GunAbility {
 
         // ---- trace (hitscan, through thin materials for less damage)
         double range = num("range", 200);
-        double base = num("damage", 36.0) * num("damage-scale", 0.3) * Combat.strength(p);
+        double base = num("damage", 36.0) * num("damage-scale", 0.1) * Combat.strength(p);
         Vector pos = eye.toVector();
         double travelled = 0;
         double mult = 1.0;
@@ -354,6 +355,7 @@ final class Ak47Ability extends GunAbility {
 
         Vector keep = le.getVelocity();
         // Combat.damage multiplies by the global ability buff: divide it out so damage-scale means what it says
+        Deaths.tagNext(head ? "headshot" : null);
         Combat.damage(le, finalDamage / Math.max(0.01, Combat.globalMult()), p);
         le.setVelocity(keep); // bullets do not knock people back
 

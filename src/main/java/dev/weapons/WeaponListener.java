@@ -65,12 +65,14 @@ final class WeaponListener implements Listener {
         WeaponType type = plugin.items().identify(item);
         if (type != null) {
             plugin.ability(type).onHit(p, victim, item, e);
+            Animations.trigger(plugin, p, type, "hit");
             // Weapon swings also deal a share of their damage as armor-piercing damage, so full netherite doesn't blunt them
             double share = plugin.getConfig().getDouble("damage.melee-pierce-share", 0.5);
             if (share > 0 && type != WeaponType.FANTASY_TAMER) {
                 final double extra = e.getDamage() * share;
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (victim.isValid() && Combat.valid(plugin, p, victim)) {
+                        Deaths.record(victim, p, type);
                         Combat.pierce(victim, extra, p);
                     }
                 });
@@ -111,6 +113,7 @@ final class WeaponListener implements Listener {
         }
         try {
             plugin.ability(type).onUse(p, item, e);
+            Animations.trigger(plugin, p, type, "use");
         } catch (Throwable ex) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE, "Error in " + type.displayName() + " (right-click)", ex);
             p.sendMessage(net.kyori.adventure.text.Component.text("Something went wrong, check the server console.", net.kyori.adventure.text.format.NamedTextColor.RED));
@@ -151,6 +154,7 @@ final class WeaponListener implements Listener {
             a.onQuit(e.getPlayer());
         }
         plugin.flash().forget(e.getPlayer());
+        ModelAnim.stop(e.getPlayer());
     }
 
     // ------------------------------------------------------------------ mining

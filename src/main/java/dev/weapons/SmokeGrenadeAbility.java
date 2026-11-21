@@ -95,6 +95,7 @@ final class SmokeGrenadeAbility extends Ability {
         }
         double strength = p.isSneaking() ? num("low-strength", 0.0) : num("high-strength", 1.0);
         launch(p, strength);
+        Animations.trigger(plugin, p, type(), "throw");
         if (p.getGameMode() != GameMode.CREATIVE) {
             ItemStack hand = p.getInventory().getItemInMainHand();
             hand.setAmount(hand.getAmount() - 1);
@@ -402,8 +403,8 @@ final class SmokeGrenadeAbility extends Ability {
             return true;
         }
         if (c.age % 2 == 0) {
-            double density = num("particle-density", 0.1);
-            int n = (int) Math.max(4, Math.min(40, shown * density));
+            double density = num("particle-density", 0.4);
+            int n = (int) Math.max(6, Math.min((int) num("max-particles-per-burst", 120), shown * density));
             if (c.age < c.bloom) {
                 n *= 2;
             }
@@ -414,7 +415,7 @@ final class SmokeGrenadeAbility extends Ability {
                 }
                 int g = 150 + rnd.nextInt(50);
                 Location l = new Location(c.w, v[0] + rnd.nextDouble(), v[1] + rnd.nextDouble(), v[2] + rnd.nextDouble());
-                Fx.dust(l, Color.fromRGB(g, g, g + 4), 3.0f, 1, 0);
+                Fx.forceDust(l, Color.fromRGB(g, g, g + 4), 4.0f);
             }
         }
         if (c.age % 10 == 0) {

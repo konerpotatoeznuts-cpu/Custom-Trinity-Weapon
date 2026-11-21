@@ -17,7 +17,8 @@ enum WeaponType {
     SONIC_SHOES("sonic_shoes", "Sonic's Shoes", "NETHERITE_BOOTS"),
     SMOKE_GRENADE("smoke_grenade", "Smoke Grenade", "EGG"),
     AK47("ak47", "AK-47", "CROSSBOW"),
-    ROCKET_LAUNCHER("rocket_launcher", "Rocket Launcher", "CROSSBOW");
+    ROCKET_LAUNCHER("rocket_launcher", "Rocket Launcher", "CROSSBOW"),
+    CRYO_TEMPEST("cryo_tempest", "Cryo Tempest", "BOW");
 
     private final String id;
     private final String displayName;
@@ -36,7 +37,7 @@ enum WeaponType {
 
     /** Never breaks. (The Sea Truncheon has Mending and Unbreaking instead.) */
     boolean unbreakable() {
-        return this == DURANDAL || this == ELDRITCH_MACE || this == HALBERD_OF_DESPAIR || this == SONIC_SHOES || this == AK47 || this == ROCKET_LAUNCHER;
+        return this == DURANDAL || this == ELDRITCH_MACE || this == HALBERD_OF_DESPAIR || this == SONIC_SHOES || this == AK47 || this == ROCKET_LAUNCHER || this == CRYO_TEMPEST;
     }
 
     String id() {

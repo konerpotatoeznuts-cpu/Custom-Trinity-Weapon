@@ -131,6 +131,8 @@ abstract class GunAbility extends Ability {
         r.total = Math.max(2, (int) (num("reload-seconds", defaultReloadSeconds()) * 20));
         reloading.put(id, r);
         onReloadStart(p);
+        Animations.trigger(plugin, p, type(), "reload");
+        Anim.play(plugin, p, type(), "reload", r.total);
     }
 
     protected void onReloadStart(Player p) {
@@ -152,6 +154,7 @@ abstract class GunAbility extends Ability {
         }
         if (held == null || plugin.items().identify(held) != type() || p.getInventory().getHeldItemSlot() != r.slot) {
             reloading.remove(id);
+            ModelAnim.stop(p);
             p.sendActionBar(Component.text("Reload cancelled.", NamedTextColor.RED));
             return;
         }

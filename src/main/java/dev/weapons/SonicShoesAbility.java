@@ -320,6 +320,7 @@ final class SonicShoesAbility extends Ability {
             s.charge++;
         }
         Location l = p.getLocation();
+        Animations.trigger(plugin, p, type(), "spin_dash_charge");
         Fx.sound(l, Sound.BLOCK_NOTE_BLOCK_CHIME, 1.0f, 0.6f + 0.2f * s.charge);
         Fx.sound(l, Sound.ENTITY_BREEZE_WIND_BURST, 0.5f, 0.8f + 0.15f * s.charge);
         Fx.burst(l.clone().add(0, 0.1, 0), Particle.CLOUD, 6 + 2 * s.charge, 0.4, 0.05);
@@ -353,6 +354,7 @@ final class SonicShoesAbility extends Ability {
                 s.dir = look.normalize();
                 s.charge = 0;
                 startRoll(p, s, speed, true);
+                Animations.trigger(plugin, p, type(), "spin_dash_launch");
                 Fx.burst(loc.clone().add(0, 0.5, 0), Particle.CLOUD, 25, 0.4, 0.3);
                 Fx.sound(loc, Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST, 1.2f, 1.4f);
                 Fx.shockwave(loc.clone().add(0, 0.15, 0), plugin.settings().spin(p).at(System.currentTimeMillis()), 3.5, 8);

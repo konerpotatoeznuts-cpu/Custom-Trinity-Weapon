@@ -93,6 +93,8 @@ final class RevolverAbility extends Ability {
         r.slot = p.getInventory().getHeldItemSlot();
         r.load = Math.max(1, load);
         r.total = Math.max(2, (int) (reloadSeconds(r.load) * 20));
+        Animations.trigger(plugin, p, type(), "reload");
+        Anim.play(plugin, p, type(), "reload", r.total);
         reloading.put(id, r);
         Fx.sound(p.getLocation(), Sound.ITEM_CROSSBOW_LOADING_START, 1.0f, 0.9f);
     }
@@ -129,6 +131,7 @@ final class RevolverAbility extends Ability {
         }
         if (held == null || p.getInventory().getHeldItemSlot() != r.slot) {
             reloading.remove(id);
+            ModelAnim.stop(p);
             p.sendActionBar(Component.text("Reload cancelled.", NamedTextColor.RED));
             return;
         }
@@ -192,6 +195,7 @@ final class RevolverAbility extends Ability {
             return;
         }
         lastShot.put(id, now);
+        Animations.trigger(plugin, p, type(), "fire");
 
         int ammo = plugin.items().getAmmo(item) - 1;
         plugin.items().setAmmo(item, ammo);

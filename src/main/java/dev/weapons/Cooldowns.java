@@ -45,6 +45,9 @@ final class Cooldowns {
     }
 
     void start(Player p, WeaponType t, String key, double seconds) {
+        if (!key.equals("throw") || t != WeaponType.GREAT_AXE) { // the Great Axe plays its throw when it is thrown, not when it lands
+            Anim.ability(plugin, p, t, key);
+        }
         expiry.computeIfAbsent(p.getUniqueId(), x -> new HashMap<>())
                 .put(k(t, key), System.currentTimeMillis() + (long) (seconds * 1000));
     }

@@ -75,6 +75,7 @@ public final class WeaponsPlugin extends JavaPlugin {
         register(new SmokeGrenadeAbility(this));
         register(new Ak47Ability(this));
         register(new RocketLauncherAbility(this));
+        register(new CryoTempestAbility(this));
 
         WeaponCommand command = new WeaponCommand(this);
         PluginCommand pc = Objects.requireNonNull(getCommand("weapon"), "weapon command missing from plugin.yml");
@@ -84,6 +85,7 @@ public final class WeaponsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(settings, this);
         getServer().getPluginManager().registerEvents(menu, this);
         settings.loadOnline();
+        getServer().getPluginManager().registerEvents(new Deaths(this), this);
         getServer().getPluginManager().registerEvents(new WeaponListener(this), this);
         getServer().getPluginManager().registerEvents(new RestrictionListener(this), this);
         getServer().getPluginManager().registerEvents(tamers, this);
@@ -101,6 +103,7 @@ public final class WeaponsPlugin extends JavaPlugin {
         }
         if (flash != null) {
             flash.shutdown();
+            ModelAnim.shutdown();
         }
         if (qte != null) {
             qte.shutdown();
