@@ -263,7 +263,8 @@ weapons:
     smoke-radius: 3.6             # blocks (144 units)
     smoke-seconds: 18
     bloom-ticks: 20               # how fast the cloud expands
-    particle-density: 0.1         # lower = fewer particles (easier on phones), thinner smoke
+    particle-density: 0.4         # higher = thicker smoke, lower = easier on phones
+    max-particles-per-burst: 120
     max-voxels: 420
     projectile-hole-radius: 1.1   # arrows, bullets, tridents, eggs... cut a hole this wide as they fly through the smoke
     hole-seconds: 3.0             # how long a hole takes to fill in
@@ -274,7 +275,7 @@ weapons:
     material: CROSSBOW
     # Counter-Strike 2 numbers (Source units: 40 units = 1 block)
     damage: 36                    # CS2 hp per bullet to the chest
-    damage-scale: 0.3             # CS2 has 100 hp, Minecraft 20: 0.3 = 10.8 per chest hit, 43 per headshot
+    damage-scale: 0.1             # CS2 has 100 hp, Minecraft 20: 0.1 = 3.6 per chest hit, 14 per headshot (before the global ability buff)
     headshot-multiplier: 4.0      # chest x1, stomach x1.25, legs x0.75 are built in
     range-modifier: 0.98          # damage kept per 500 units (12.5 blocks)
     range: 200                    # blocks
@@ -312,3 +313,58 @@ weapons:
     fuse-seconds: 8
     recoil: 0.5
     camera-kick: 5.0
+
+  cryo_tempest:
+    material: BOW
+    min-force: 0.5                # draw strength needed for Arrow Rain
+    rain-cooldown: 25
+    rain-radius: 5.5
+    rain-launch-speed: 1.6
+    rain-max-seconds: 4           # the arrow rains by itself after this long, or when it hits a block
+    rain-seconds: 3.5
+    rain-damage: 1.6              # per pulse (every 0.5s)
+    rain-arrows-per-burst: 5
+    rain-height: 18
+    rain-fall-speed: 1.8
+    pilot-cooldown: 12
+    double-sneak-ms: 400
+    pilot-speed-min: 1.1
+    pilot-speed-max: 2.8
+    pilot-turn-min: 0.10
+    pilot-turn-max: 0.45
+    pilot-hitbox-min: 0.8
+    pilot-hitbox-max: 2.0
+    pilot-damage-min: 4.0
+    pilot-damage-max: 10.0
+    pilot-blast-min: 2.5          # frost blast radius on hit (scales with draw)
+    pilot-blast-max: 5.0
+    pilot-seconds: 6
+    slow-seconds: 3
+    slow-level: 2
+    freeze-ticks: 140
+
+death-messages:
+  enabled: true                   # weapon-specific chat messages when an ability kills someone
+  window-ticks: 100               # a hit counts for this long (5 seconds)
+
+# Animation hooks. Commands run from the console when something happens with a weapon, so a model plugin can play an animation.
+# Events: use (any right-click), hit (melee hit), fire (guns), reload, throw (smoke grenade),
+#         spin_dash_charge, spin_dash_launch (Sonic's Shoes).
+# Placeholders: %player% %uuid% %world% %x% %y% %z%.  Example for BetterModel/ModelEngine-style plugins:
+#   ak47:
+#     fire:
+#       - "bettermodel play %player% ak_fire"       (use the real command of your model plugin)
+animations:
+  enabled: true
+  ghost-weapon: true             # a ghost copy of the weapon performs each ability (Java players; per-player toggle in /weapons config)
+  # BetterModel player animations (install BetterModel, put a player model in plugins/BetterModel/players/).
+  # The animation names inside the model are  <weapon id>_<event>, for example:
+  #   halberd_of_despair_spin, excalibur_uppercut, excalibur_slash, durandal_beam, sea_truncheon_tsunami,
+  #   ak47_reload, ak47_fire, rocket_launcher_reload, medusas_revolver_reload, sonic_shoes_spin_dash_launch ...
+  # A missing animation just falls back to the built-in ghost weapon.
+  bettermodel:
+    enabled: true
+    model: weapons                # file name (without .bbmodel) of the player model that holds the animations
+    hide-player: true             # hide the normal player model while the animation plays (the model replaces it)
+    models: {}                    # optional per weapon: { ak47: guns, halberd_of_despair: melee }
+    loop: {}                      # optional per animation: { ak47_fire: PLAY_ONCE, some_anim: LOOP }  (PLAY_ONCE, LOOP, HOLD_ON_LAST)
