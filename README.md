@@ -36,6 +36,7 @@ Abilities only work on items given with `/weapon give` (they carry a hidden tag)
 | Smoke Grenade | egg | Right-click: full throw. Sneak + right-click: low throw. Counter-Strike 2 throw speed, gravity and bounces; pops when it stops into a smoke cloud that fills the room (not through walls), lasts 18s, puts out fires. Arrows, bullets, throwables, explosions and every weapon ability punch holes in it |
 | AK-47 | crossbow | Hold right-click: full auto (600 RPM, 30 rounds), CS2 spray pattern, headshots x4, wallbang through thin blocks. F / right-click empty = reload (arrows) |
 | Rocket Launcher | crossbow | Right-click: fire a rocket. CS2 HE-grenade blast (8.75 blocks, no damage through walls, hurts you too). F = reload (firework rocket) |
+| Cryo Tempest | bow | Frost arrows slow and freeze. Shoot while sneaking (aim up): the arrow flies on, let go of sneak and frost arrows rain where it is (25s). Shoot, then double-sneak mid-flight: pilot the arrow by looking, it explodes on the first hit; harder draw = faster, stronger, bigger blast, quicker turning (12s). Ammo: arrow |
 
 The white bar in the hotbar is the normal item cooldown (like Ender Pearls). Weapons with two abilities only show it when
 both are cooling down. Medusa's Revolver shows its gaze cooldown on the action bar.
@@ -73,3 +74,26 @@ The flashbang's Java screen is six huge flat-white see-through panels boxed arou
 ### /weapons config (everyone)
 Opens a menu: spin / trail / electric colors (incl. rainbow), spin ball, speed trail and electric sparks on or off, particles on or off for all weapons or each weapon, weapon sounds, and the flashbang white screen. Settings are saved per player and only change what that player sees and hears. Particles from a weapon are matched by the code that spawns them, so new weapons need an entry in `Fx.SOURCES` to get their own toggle.
 - Spin dash tip: hold any item (an empty hand sends no right-click in the air) and sneak, then right-click up to 5 times. Keep sneaking to keep spinning; let go of sneak to launch.
+
+## Death messages
+When an ability kills a player, chat shows a message written for that weapon ("... was flattened by X's Eldritch Mace") instead of
+"was killed by magic". Edit the lines in `Deaths.java`; turn off with `death-messages.enabled: false`.
+
+## Animation hooks
+`animations:` in config.yml runs console commands on weapon events (use, hit, fire, reload, throw, spin_dash_charge,
+spin_dash_launch), so a model plugin (BetterModel, ModelEngine, Animated Java datapacks) can play an animation.
+Java Edition only: Bedrock players (Geyser) cannot see display-entity models.
+
+## Ability animations
+Every ability now plays a built-in animation: a ghost copy of the weapon (with its own texture) slashes, smashes, spins, thrusts,
+cuts upward or rises into the air around the player. Guns flip in front of you while reloading. Java players see it; Bedrock
+players keep the particles. Turn off with `animations.ghost-weapon: false` (or per player: the weapon's particles toggle in `/weapons config`).
+Custom Blockbench models can still be wired through the `animations:` command hooks (`ability_<name>` events).
+
+## BetterModel animations
+Install BetterModel, put a player model (Blockbench, like the `steve.bbmodel` BetterModel creates) in
+`plugins/BetterModel/players/weapons.bbmodel` and add animations named `<weapon id>_<event>`: `halberd_of_despair_spin`,
+`excalibur_uppercut`, `durandal_beam`, `ak47_reload`, `ak47_fire`, `rocket_launcher_reload`, `medusas_revolver_reload`,
+`sonic_shoes_spin_dash_launch`, ... The plugin plays them on the player with BetterModel's API (nothing to install on the
+plugin side, it finds BetterModel by itself). Missing animation = the built-in ghost weapon plays instead.
+Test one by hand (op): `/bettermodel play weapons ak47_reload`. Settings under `animations.bettermodel` in config.yml.
