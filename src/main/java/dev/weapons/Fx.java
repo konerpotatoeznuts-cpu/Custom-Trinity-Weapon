@@ -64,8 +64,36 @@ final class Fx {
         return context();
     }
 
+    private static final StackWalker WALKER = StackWalker.getInstance();
+
+    /**
+     * Effects that loop (rings, lines, clouds) look up their weapon ONCE and open a scope, so the thousands of particle calls
+     * inside do not each walk the stack. {@link #begin(WeaponType)} / {@link #end()} are main-thread only.
+     */
+    private static boolean scopeOn;
+    private static WeaponType scopeType;
+
+    static void begin(WeaponType t) {
+        scopeOn = true;
+        scopeType = t;
+    }
+
+    /** Opens a scope for the calling weapon unless one is already open. Returns true if THIS call opened it (and must call end()). */
+    static boolean beginHere() {
+        if (!scopeOn && !fast()) {
+            begin(context());
+            return true;
+        }
+        return false;
+    }
+
+    static void end() {
+        scopeOn = false;
+        scopeType = null;
+    }
+
     private static WeaponType context() {
-        return StackWalker.getInstance().walk(frames -> frames.limit(14)
+        return WALKER.walk(frames -> frames.limit(14)
                 .map(f -> source(f.getClassName()))
                 .filter(java.util.Objects::nonNull)
                 .findFirst().orElse(null));
@@ -94,18 +122,89 @@ final class Fx {
             }
             return;
         }
-        WeaponType src = context();
+        WeaponType src = scopeOn ? scopeType : context();
         double range = force ? 192 : 64;
-        for (Player v : w.getPlayers()) {
-            if (v.getLocation().distanceSquared(l) > range * range || !settings.particles(v, src)) {
+        Snap s = snap(w);
+        double lx = l.getX(), ly = l.getY(), lz = l.getZ();
+        for (int i = 0; i < s.n; i++) {
+            Player v = s.v[i];
+            double ddx = s.x[i] - lx, ddy = s.y[i] - ly, ddz = s.z[i] - lz;
+            double r = range;
+            boolean low = settings.lowFx(v);
+            if (low) {
+                r = Math.min(r, 40); // low-FPS mode: only effects that are close
+            }
+            if (ddx * ddx + ddy * ddy + ddz * ddz > r * r || !settings.particles(v, src)) {
                 continue;
             }
+            int c = count;
+            if (low) {
+                // low-FPS mode (opt-in per player): this player receives fewer particles. Everybody else is unaffected.
+                if (count <= 1) {
+                    if (java.util.concurrent.ThreadLocalRandom.current().nextInt(100) >= 45) {
+                        continue;
+                    }
+                } else {
+                    c = Math.max(1, (int) Math.ceil(count * 0.45));
+                }
+            }
             if (data == null) {
-                v.spawnParticle(particle, l, count, dx, dy, dz, speed);
+                v.spawnParticle(particle, l, c, dx, dy, dz, speed);
             } else {
-                v.spawnParticle(particle, l, count, dx, dy, dz, speed, data);
+                v.spawnParticle(particle, l, c, dx, dy, dz, speed, data);
             }
         }
+    }
+
+    // ------------------------------------------------------------------ one player list per world per tick
+
+    private static final class Snap {
+        int tick = -1;
+        int n;
+        Player[] v = new Player[0];
+        double[] x = new double[0];
+        double[] y = new double[0];
+        double[] z = new double[0];
+    }
+
+    private static final java.util.Map<World, Snap> SNAPS = new java.util.IdentityHashMap<>();
+
+    /** Every player in the world and where they stand, taken once per tick (hundreds of effect calls share it). */
+    private static Snap snap(World w) {
+        Snap s = SNAPS.computeIfAbsent(w, k -> new Snap());
+        int now = org.bukkit.Bukkit.getCurrentTick();
+        if (s.tick != now) {
+            java.util.List<Player> list = w.getPlayers();
+            int n = list.size();
+            if (s.v.length < n) {
+                s.v = new Player[n];
+                s.x = new double[n];
+                s.y = new double[n];
+                s.z = new double[n];
+            }
+            int k = 0;
+            for (Player p : list) {
+                if (!p.isOnline()) {
+                    continue;
+                }
+                s.v[k] = p;
+                s.x[k] = p.getX();
+                s.y[k] = p.getY();
+                s.z[k] = p.getZ();
+                k++;
+            }
+            for (int i = k; i < s.n; i++) {
+                s.v[i] = null; // do not hold on to players who left
+            }
+            s.n = k;
+            s.tick = now;
+        }
+        return s;
+    }
+
+    /** Forget a world (unloaded). */
+    static void forgetWorlds() {
+        SNAPS.clear();
     }
 
     static void dust(Location l, Color color, float size, int count, double spread) {
@@ -163,9 +262,11 @@ final class Fx {
             return;
         }
         double range = Math.max(16, 16.0 * volume);
-        for (Player v : w.getPlayers()) {
-            if (v.getLocation().distanceSquared(l) <= range * range && settings.on(v, "sounds")) {
-                v.playSound(l, sound, SoundCategory.PLAYERS, volume, pitch);
+        Snap s = snap(w);
+        for (int i = 0; i < s.n; i++) {
+            double ddx = s.x[i] - l.getX(), ddy = s.y[i] - l.getY(), ddz = s.z[i] - l.getZ();
+            if (ddx * ddx + ddy * ddy + ddz * ddz <= range * range && settings.on(s.v[i], "sounds")) {
+                s.v[i].playSound(l, sound, SoundCategory.PLAYERS, volume, pitch);
             }
         }
     }
@@ -212,9 +313,16 @@ final class Fx {
 
     /** Calls {@code each} for points on a horizontal ring around center. */
     static void ring(Location center, double radius, int points, double angleOffset, Consumer<Location> each) {
-        for (int i = 0; i < points; i++) {
-            double a = angleOffset + (Math.PI * 2 * i) / points;
-            each.accept(center.clone().add(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+        boolean mine = beginHere();
+        try {
+            for (int i = 0; i < points; i++) {
+                double a = angleOffset + (Math.PI * 2 * i) / points;
+                each.accept(center.clone().add(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+            }
+        } finally {
+            if (mine) {
+                end();
+            }
         }
     }
 
@@ -228,9 +336,16 @@ final class Fx {
         }
         Vector dir = diff.normalize().multiply(step);
         Location cur = from.clone();
-        for (double d = 0; d < len; d += step) {
-            each.accept(cur.clone());
-            cur.add(dir);
+        boolean mine = beginHere();
+        try {
+            for (double d = 0; d < len; d += step) {
+                each.accept(cur.clone());
+                cur.add(dir);
+            }
+        } finally {
+            if (mine) {
+                end();
+            }
         }
     }
 }

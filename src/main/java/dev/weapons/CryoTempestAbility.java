@@ -1,6 +1,8 @@
 package dev.weapons;
 
+import io.papermc.paper.entity.TeleportFlag;
 import org.bukkit.Color;
+import org.bukkit.GameMode;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -8,13 +10,18 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.AbstractArrow;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -46,6 +53,7 @@ final class CryoTempestAbility extends Ability {
 
     private static final Color ICE = Color.fromRGB(150, 220, 255);
     private static final Color ICE_DEEP = Color.fromRGB(60, 140, 255);
+    private static final Color FIRE = Color.fromRGB(255, 170, 70);
 
     private static final class Flight {
         final Arrow arrow;
@@ -63,11 +71,21 @@ final class CryoTempestAbility extends Ability {
     private final Map<UUID, Flight> flights = new HashMap<>();
     private final Map<UUID, Long> lastSneak = new HashMap<>();
     private final Random rnd = new Random();
+    /** Players currently riding their arrow in first person (their body is parked, they are in spectator mode). */
+    private final Map<UUID, Saved> riding = new HashMap<>();
+    private final NamespacedKey stateKey;
+    /** The stand-in body left where the player was, and which player it belongs to (by the decoy's uuid). */
+    private final Map<UUID, LivingEntity> decoys = new HashMap<>();
+    private final Map<UUID, UUID> decoyOwner = new HashMap<>();
+
+    private record Saved(GameMode mode, Location origin, float flySpeed, boolean allowFlight, boolean flying) {
+    }
 
     CryoTempestAbility(WeaponsPlugin plugin) {
         super(plugin);
         this.frostKey = new NamespacedKey(plugin, "cryo_arrow");
         this.rainKey = new NamespacedKey(plugin, "cryo_rain_arrow");
+        this.stateKey = new NamespacedKey(plugin, "cryo_pilot_state");
         plugin.getServer().getPluginManager().registerEvents(new Events(), plugin);
     }
 
@@ -78,6 +96,7 @@ final class CryoTempestAbility extends Ability {
 
     @Override
     void onQuit(Player p) {
+        endFirstPerson(p);
         flights.remove(p.getUniqueId());
         lastSneak.remove(p.getUniqueId());
     }
@@ -113,6 +132,68 @@ final class CryoTempestAbility extends Ability {
             // normal frost arrow, which can be piloted with a double sneak
             flights.put(p.getUniqueId(), new Flight(arrow, force));
             frostTrail(arrow, 100);
+        }
+
+        /** A crash or restart in the middle of a flight leaves the player in spectator mode: put them back. */
+        @EventHandler
+        public void onJoin(PlayerJoinEvent e) {
+            Player p = e.getPlayer();
+            String st = p.getPersistentDataContainer().get(stateKey, PersistentDataType.STRING);
+            if (st == null) {
+                return;
+            }
+            p.getPersistentDataContainer().remove(stateKey);
+            try {
+                String[] a = st.split(";");
+                p.setGameMode(GameMode.valueOf(a[0]));
+                p.setFlySpeed(Float.parseFloat(a[1]));
+                World w = plugin.getServer().getWorld(UUID.fromString(a[2]));
+                if (w != null) {
+                    p.teleport(new Location(w, Double.parseDouble(a[3]), Double.parseDouble(a[4]), Double.parseDouble(a[5])));
+                }
+            } catch (Throwable t) {
+                p.setGameMode(GameMode.SURVIVAL);
+            }
+        }
+
+        /** Hits on the stand-in body hurt the real player (who is a safe spectator while flying). */
+        @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
+        public void onDecoyDamage(EntityDamageEvent e) {
+            UUID owner = decoyOwner.get(e.getEntity().getUniqueId());
+            if (owner == null) {
+                return;
+            }
+            e.setCancelled(true); // the decoy itself never dies
+            switch (e.getCause()) {
+                case FALL, VOID, SUFFOCATION, CRAMMING -> {
+                    return;
+                }
+                default -> {
+                }
+            }
+            Player p = plugin.getServer().getPlayer(owner);
+            if (p == null || !p.isOnline() || p.isDead()) {
+                return;
+            }
+            double dmg = e.getFinalDamage();
+            if (dmg <= 0) {
+                return;
+            }
+            double hp = p.getHealth() - dmg;
+            if (hp <= 0) {
+                endFirstPerson(p); // back into the body first, then it dies there
+                if (e instanceof EntityDamageByEntityEvent be) {
+                    p.damage(10000.0, be.getDamager());
+                } else {
+                    p.setHealth(0);
+                }
+                return;
+            }
+            p.setHealth(hp);
+            p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0f, 1.0f);
+            p.sendActionBar(net.kyori.adventure.text.Component.text("Your body is under attack!  " + (int) Math.ceil(hp) + " HP left",
+                    net.kyori.adventure.text.format.NamedTextColor.RED));
+            Fx.burst(e.getEntity().getLocation().add(0, 1, 0), Particle.DAMAGE_INDICATOR, 4, 0.3, 0.1);
         }
 
         @EventHandler
@@ -275,7 +356,7 @@ final class CryoTempestAbility extends Ability {
                 if (k % 10 == 0) {
                     Location mid = target.clone().add(0, 1, 0);
                     for (LivingEntity le : w.getNearbyLivingEntities(mid, radius, 4, radius)) {
-                        if (Combat.valid(plugin, p, le) && flat(le.getLocation(), target) <= radius) {
+                        if (ok(p, le) && flat(le.getLocation(), target) <= radius) {
                             Combat.damage(le, dmg * Combat.strength(p), p);
                             freeze(le, 0.8);
                             Fx.burst(le.getLocation().add(0, 1, 0), Particle.SNOWFLAKE, 8, 0.3, 0.05);
@@ -284,6 +365,11 @@ final class CryoTempestAbility extends Ability {
                 }
             }
         }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    /** A valid target, but never the caster's own stand-in body. */
+    private boolean ok(Player p, LivingEntity e) {
+        return !p.getUniqueId().equals(decoyOwner.get(e.getUniqueId())) && Combat.valid(plugin, p, e);
     }
 
     private static double flat(Location a, Location b) {
@@ -331,13 +417,19 @@ final class CryoTempestAbility extends Ability {
         Fx.sound(arrow.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.0f, 1.8f);
         Fx.sound(p.getLocation(), Sound.ENTITY_PLAYER_HURT_FREEZE, 1.0f, 1.4f);
         Fx.burst(arrow.getLocation(), Particle.SNOWFLAKE, 20, 0.4, 0.1);
+        Fx.shockwave(arrow.getLocation(), ICE, 2.5, 5);
+        Fx.burst(arrow.getLocation(), Particle.END_ROD, 10, 0.5, 0.2);
+        Fx.dustFade(arrow.getLocation(), FIRE, Color.WHITE, 1.8f, 12, 0.4);
 
+        final World w0 = arrow.getWorld();
+        final boolean fp = startFirstPerson(p);
         final Set<UUID> hit = new HashSet<>();
         new BukkitRunnable() {
             int t = 0;
             int hits = 0;
             boolean exploded = false;
             Vector prev = arrow.getLocation().toVector();
+            final java.util.ArrayDeque<Vector> trail = new java.util.ArrayDeque<>();
 
             @Override
             public void run() {
@@ -363,13 +455,13 @@ final class CryoTempestAbility extends Ability {
                     Vector pt = prev.clone().add(now.clone().subtract(prev).multiply(i / (double) steps));
                     Location at = new Location(w, pt.getX(), pt.getY(), pt.getZ());
                     for (LivingEntity le : w.getNearbyLivingEntities(at, radius)) {
-                        if (!Combat.valid(plugin, p, le)) {
+                        if (!ok(p, le)) {
                             continue;
                         }
                         // direct hit: the bolt detonates in a frost blast
                         Location b = le.getLocation().add(0, le.getHeight() / 2, 0);
                         for (LivingEntity v : w.getNearbyLivingEntities(b, blast)) {
-                            if (Combat.valid(plugin, p, v)) {
+                            if (ok(p, v)) {
                                 hit.add(v.getUniqueId());
                                 hits++;
                                 Combat.damage(v, dmg * Combat.strength(p), p);
@@ -381,6 +473,7 @@ final class CryoTempestAbility extends Ability {
                         Fx.burst(b, Particle.END_ROD, 16, blast * 0.3, 0.2);
                         Fx.dustFade(b, ICE, Color.WHITE, 2.5f, 30, blast * 0.4);
                         Fx.shockwave(b, ICE, blast, 8);
+                        iceZone(groundBelow(b), blast);
                         Fx.sound(b, Sound.BLOCK_GLASS_BREAK, 1.5f, 0.7f);
                         Fx.sound(b, Sound.ENTITY_PLAYER_HURT_FREEZE, 1.5f, 0.8f);
                         Fx.sound(b, Sound.ENTITY_GENERIC_EXPLODE, 0.6f, 1.6f);
@@ -393,9 +486,36 @@ final class CryoTempestAbility extends Ability {
                 prev = now;
                 // trail, as thick as the hitbox
                 Location l = arrow.getLocation();
-                Fx.dust(l, ICE, (float) Math.min(4.0, 1.0 + radius), 3, radius * 0.25);
-                Fx.dustFade(l, ICE_DEEP, Color.WHITE, 1.2f, 2, radius * 0.3);
-                Fx.burst(l, Particle.SNOWFLAKE, 2, radius * 0.2, 0.0);
+                if (fp) {
+                    followArrow(p, l);
+                } else {
+                    // glowing orange-white head (not drawn in first person: it would sit right in the camera)
+                    Fx.dust(l, FIRE, 1.7f, 2, 0.06);
+                    Fx.dust(l, Color.WHITE, 1.2f, 1, 0.03);
+                    Fx.burst(l, Particle.FLAME, 1, 0.04, 0.01);
+                    Fx.burst(l, Particle.END_ROD, 1, 0.05, 0.0);
+                }
+                // long tapering blue streak behind it, with drifting frost wisps
+                trail.addFirst(l.toVector());
+                while (trail.size() > 18) {
+                    trail.removeLast();
+                }
+                int i = 0;
+                for (Vector v : trail) {
+                    double f = 1.0 - i / 18.0;
+                    if (fp && i < 5) {
+                        i++;
+                        continue; // keep the camera clear
+                    }
+                    if (i % 2 == 0) {
+                        Location tl = new Location(w0, v.getX(), v.getY(), v.getZ());
+                        Fx.dust(tl, i < 6 ? ICE : ICE_DEEP, (float) Math.max(0.6, (0.6 + radius) * f), 1, radius * 0.18 * (1.0 - f) + 0.05);
+                    }
+                    if (i % 5 == 3) {
+                        Fx.burst(new Location(w0, v.getX(), v.getY(), v.getZ()), Particle.SNOWFLAKE, 1, radius * 0.3, 0.02);
+                    }
+                    i++;
+                }
                 if (t % 3 == 0) {
                     p.sendActionBar(net.kyori.adventure.text.Component.text("Piloting",
                             net.kyori.adventure.text.format.NamedTextColor.AQUA));
@@ -405,6 +525,9 @@ final class CryoTempestAbility extends Ability {
             private void finish() {
                 cancel();
                 flights.remove(p.getUniqueId(), f);
+                if (fp && p.isOnline()) {
+                    endFirstPerson(p);
+                }
                 if (exploded) {
                     arrow.remove();
                 } else if (arrow.isValid()) {
@@ -415,7 +538,7 @@ final class CryoTempestAbility extends Ability {
                     Fx.sound(l, Sound.BLOCK_GLASS_BREAK, 1.2f, 0.8f);
                     // a small frost burst where it ends
                     for (LivingEntity le : w(l).getNearbyLivingEntities(l, 2.5)) {
-                        if (!hit.contains(le.getUniqueId()) && Combat.valid(plugin, p, le)) {
+                        if (!hit.contains(le.getUniqueId()) && ok(p, le)) {
                             Combat.damage(le, dmg * 0.4 * Combat.strength(p), p);
                             freeze(le, 1.0);
                         }
@@ -430,8 +553,168 @@ final class CryoTempestAbility extends Ability {
         }.runTaskTimer(plugin, 1L, 1L);
     }
 
+    // ------------------------------------------------------------------ first-person camera on the arrow
+
+    /**
+     * Puts the player's camera on the arrow: they go into spectator mode (no collisions, no damage, invisible) and are moved
+     * to the arrow every tick without touching their view, so the mouse still aims it.
+     */
+    private boolean startFirstPerson(Player p) {
+        if (!plugin.getConfig().getBoolean("weapons.cryo_tempest.pilot-first-person", true) || FlashOverlay.isBedrock(p)
+                || riding.containsKey(p.getUniqueId())) {
+            return false;
+        }
+        Location o = p.getLocation();
+        riding.put(p.getUniqueId(), new Saved(p.getGameMode(), o.clone(), p.getFlySpeed(), p.getAllowFlight(), p.isFlying()));
+        p.getPersistentDataContainer().set(stateKey, PersistentDataType.STRING,
+                p.getGameMode().name() + ";" + p.getFlySpeed() + ";" + o.getWorld().getUID() + ";" + o.getX() + ";" + o.getY() + ";" + o.getZ());
+        spawnDecoy(p, o);
+        p.setGameMode(GameMode.SPECTATOR);
+        p.setFlySpeed(0f);
+        return true;
+    }
+
+    /** Keeps the camera on the arrow (the eye sits on the arrow, the view direction is left alone). */
+    private void followArrow(Player p, Location arrow) {
+        if (p.getSpectatorTarget() != null) {
+            p.setSpectatorTarget(null); // a stray click must not hand the camera to another entity
+        }
+        Location to = new Location(arrow.getWorld(), arrow.getX(), arrow.getY() - p.getEyeHeight(), arrow.getZ(), 0f, 0f);
+        p.teleport(to, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.Relative.YAW, TeleportFlag.Relative.PITCH);
+    }
+
+    /** A stand-in body: a mannequin wearing the player's skin and armor (an armor stand if the mannequin is not available). */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void spawnDecoy(Player p, Location at) {
+        LivingEntity d = null;
+        try {
+            Class<?> mc = Class.forName("org.bukkit.entity.Mannequin");
+            d = (LivingEntity) at.getWorld().spawn(at, (Class) mc, e -> {
+            });
+            try {
+                // the player's skin (best effort: the API for this changes between versions)
+                Class<?> rp = Class.forName("io.papermc.paper.datacomponent.item.ResolvableProfile");
+                for (java.lang.reflect.Method m : rp.getMethods()) {
+                    if (m.getName().equals("resolvableProfile") && java.lang.reflect.Modifier.isStatic(m.getModifiers())
+                            && m.getParameterCount() == 1 && m.getParameterTypes()[0].isAssignableFrom(p.getPlayerProfile().getClass())) {
+                        Object prof = m.invoke(null, p.getPlayerProfile());
+                        mc.getMethod("setProfile", rp).invoke(d, prof);
+                        break;
+                    }
+                }
+            } catch (Throwable ignored) {
+                // default skin
+            }
+            try {
+                mc.getMethod("setDescription", net.kyori.adventure.text.Component.class).invoke(d, net.kyori.adventure.text.Component.empty());
+            } catch (Throwable ignored) {
+                // keeps its default description
+            }
+        } catch (Throwable t) {
+            if (d != null) {
+                d.remove();
+            }
+            d = at.getWorld().spawn(at, ArmorStand.class, a -> {
+                a.setArms(true);
+                a.setBasePlate(false);
+            });
+        }
+        d.setPersistent(false);
+        d.setSilent(true);
+        d.setRemoveWhenFarAway(false);
+        try {
+            d.setAI(false);
+        } catch (Throwable ignored) {
+            // armor stands have no AI
+        }
+        d.customName(net.kyori.adventure.text.Component.text(p.getName()));
+        d.setCustomNameVisible(true);
+        org.bukkit.inventory.EntityEquipment eq = d.getEquipment();
+        if (eq != null) {
+            eq.setArmorContents(p.getInventory().getArmorContents());
+            eq.setItemInMainHand(p.getInventory().getItemInMainHand().clone());
+            eq.setHelmetDropChance(0f);
+            eq.setChestplateDropChance(0f);
+            eq.setLeggingsDropChance(0f);
+            eq.setBootsDropChance(0f);
+            eq.setItemInMainHandDropChance(0f);
+        }
+        decoys.put(p.getUniqueId(), d);
+        decoyOwner.put(d.getUniqueId(), p.getUniqueId());
+    }
+
+    private void removeDecoy(UUID player) {
+        LivingEntity d = decoys.remove(player);
+        if (d != null) {
+            decoyOwner.remove(d.getUniqueId());
+            d.remove();
+        }
+    }
+
+    private void endFirstPerson(Player p) {
+        Saved s = riding.remove(p.getUniqueId());
+        if (s == null) {
+            return;
+        }
+        p.getPersistentDataContainer().remove(stateKey);
+        removeDecoy(p.getUniqueId());
+        if (p.getSpectatorTarget() != null) {
+            p.setSpectatorTarget(null);
+        }
+        p.setGameMode(s.mode());
+        p.setFlySpeed(s.flySpeed());
+        p.setAllowFlight(s.allowFlight());
+        p.setFlying(s.flying());
+        Location o = s.origin().clone();
+        o.setYaw(0f);
+        o.setPitch(0f);
+        p.teleport(o, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.Relative.YAW, TeleportFlag.Relative.PITCH);
+        p.setFallDistance(0f);
+        p.setVelocity(new Vector(0, 0, 0));
+    }
+
+    /** A frozen disc on the ground where the bolt landed: frost fills it, then it fades. */
+    private void iceZone(Location center, double radius) {
+        new BukkitRunnable() {
+            int t = 0;
+
+            @Override
+            public void run() {
+                if (t++ > 24) {
+                    cancel();
+                    return;
+                }
+                double r = t < 6 ? radius * (t / 6.0) : radius;
+                Location g = center.clone().add(0, 0.12, 0);
+                if (t % 3 == 1) {
+                    Fx.ring(g, r, 30, rnd.nextDouble(), l -> Fx.dust(l, ICE_DEEP, 1.4f, 1, 0));
+                    Fx.ring(g, r * 0.6, 20, rnd.nextDouble(), l -> Fx.dust(l, ICE, 1.2f, 1, 0));
+                }
+                int n = t < 6 ? 14 : 6;
+                for (int i = 0; i < n; i++) {
+                    double a = rnd.nextDouble() * Math.PI * 2;
+                    double d = Math.sqrt(rnd.nextDouble()) * r;
+                    Location pt = g.clone().add(Math.cos(a) * d, 0, Math.sin(a) * d);
+                    Fx.dust(pt, rnd.nextBoolean() ? ICE : Color.WHITE, 1.2f, 1, 0.05);
+                    if (i % 3 == 0) {
+                        Fx.burst(pt.clone().add(0, 0.2, 0), Particle.SNOWFLAKE, 1, 0.2, 0.02);
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
     @Override
     void shutdown() {
+        for (UUID id : new java.util.ArrayList<>(riding.keySet())) {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p != null) {
+                endFirstPerson(p);
+            }
+        }
+        for (UUID id : new java.util.ArrayList<>(decoys.keySet())) {
+            removeDecoy(id);
+        }
         flights.clear();
     }
 }

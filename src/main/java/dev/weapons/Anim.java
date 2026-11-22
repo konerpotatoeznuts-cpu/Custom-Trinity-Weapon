@@ -171,12 +171,12 @@ final class Anim {
         if (keys == null || keys.isEmpty()) {
             return;
         }
-        final float yaw = p.getLocation().getYaw();
+        final double lead = plugin.getConfig().getDouble("animations.follow-lead", 2.0);
         final ItemStack stack = plugin.items().create(type);
         stack.setAmount(1);
         final ItemDisplay d;
         try {
-            d = p.getWorld().spawn(at(p, yaw), ItemDisplay.class, e -> {
+            d = p.getWorld().spawn(p.getLocation(), ItemDisplay.class, e -> {
                 e.setItemStack(stack);
                 e.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
                 e.setBillboard(Display.Billboard.FIXED);
@@ -209,6 +209,7 @@ final class Anim {
             int t = 0;
             int idx = 0;
             int nextAt = 0;
+            Location prev = p.getLocation();
 
             @Override
             public void run() {
@@ -217,7 +218,10 @@ final class Anim {
                     cancel();
                     return;
                 }
-                d.teleport(at(p, yaw));
+                // follows the player's position (a little ahead of it, so it does not trail behind) and turns with them
+                Location cur = p.getLocation();
+                d.teleport(at(cur, prev, lead));
+                prev = cur;
                 if (t == nextAt && idx < keys.size()) {
                     Key key = keys.get(idx++);
                     d.setInterpolationDelay(0);
@@ -230,9 +234,14 @@ final class Anim {
         }.runTaskTimer(plugin, 1L, 1L);
     }
 
-    private static Location at(Player p, float yaw) {
-        Location l = p.getLocation();
-        return new Location(l.getWorld(), l.getX(), l.getY(), l.getZ(), yaw, 0);
+    private static Location at(Location cur, Location prev, double lead) {
+        double dx = 0, dy = 0, dz = 0;
+        if (prev != null && prev.getWorld() == cur.getWorld()) {
+            dx = Math.max(-1.5, Math.min(1.5, cur.getX() - prev.getX())) * lead;
+            dy = Math.max(-1.5, Math.min(1.5, cur.getY() - prev.getY())) * lead;
+            dz = Math.max(-1.5, Math.min(1.5, cur.getZ() - prev.getZ())) * lead;
+        }
+        return new Location(cur.getWorld(), cur.getX() + dx, cur.getY() + dy, cur.getZ() + dz, cur.getYaw(), 0);
     }
 
     /** blade up in the item picture is a 45 degree turn; then pitch tilts it forward, yaw turns it around the player. */

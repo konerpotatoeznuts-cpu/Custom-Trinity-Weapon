@@ -104,7 +104,7 @@ final class FlashOverlay {
                 // A text display's background is only drawn from its front side. Turn every wall to face the camera,
                 // otherwise the three walls that face outwards are invisible (that was the missing corner of the screen).
                 Vector3f normal = new Vector3f(0, 0, 1).rotate(rot0);
-                final Quaternionf rot = normal.dot((Vector3f) w[2]) > 0 ? new Quaternionf(rot0).rotateY((float) Math.PI) : rot0;
+                final Quaternionf rot = normal.dot(trans) > 0 ? new Quaternionf(rot0).rotateY((float) Math.PI) : rot0;
                 TextDisplay td = p.getWorld().spawn(p.getEyeLocation(), TextDisplay.class, e -> {
                     e.setText(" ".repeat(24));
                     e.setBackgroundColor(Color.fromARGB(255, 255, 255, 255));

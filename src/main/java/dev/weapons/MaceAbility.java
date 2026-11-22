@@ -11,6 +11,8 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import java.util.ArrayList;
+import java.util.List;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -155,22 +157,55 @@ final class MaceAbility extends Ability {
         double radius = num("pull-radius", 12.0);
         Location center = p.getLocation();
 
-        Vector me = p.getLocation().add(0, p.getHeight() / 2.0, 0).toVector();
-        for (LivingEntity le : Combat.nearby(plugin, p, center, radius)) {
-            // Full 3D pull toward the wielder's body, so targets above or below get dragged up or down too
-            Vector toward = me.clone().subtract(le.getLocation().add(0, le.getHeight() / 2.0, 0).toVector());
-            double dist = toward.length();
-            if (dist < 1.5) {
-                continue;
+        // Reach is much taller than it is wide, so targets far above or below get caught too.
+        final double height = num("pull-height", 24.0);
+        final double speed = Math.max(0.3, strength);
+        final int maxTicks = (int) num("pull-ticks", 14);
+        List<LivingEntity> caught = new ArrayList<>();
+        for (LivingEntity le : Combat.nearby(plugin, p, center, Math.hypot(radius, height))) {
+            Location el = le.getLocation();
+            if (Math.hypot(el.getX() - center.getX(), el.getZ() - center.getZ()) <= radius
+                    && Math.abs(el.getY() - center.getY()) <= height) {
+                caught.add(le);
             }
-            toward.normalize().multiply(Math.min(strength * 1.4, strength + dist * 0.04));
-            if (le.isOnGround() && toward.getY() < 0.15) {
-                toward.setY(0.15); // a little lift so they do not catch on the floor
-            }
-            le.setVelocity(toward);
-            Fx.line(le.getLocation().add(0, le.getHeight() / 2.0, 0), p.getLocation().add(0, 1, 0), 0.6,
-                    l -> Fx.dust(l, DEEP, 1.0f, 1, 0.02));
         }
+        // Everyone is dragged to the spot right under the wielder's feet and held there: the speed drops as they get close,
+        // and they are stopped dead on arrival, so nobody overshoots or flies past.
+        new BukkitRunnable() {
+            int t = 0;
+
+            @Override
+            public void run() {
+                if (!p.isOnline() || ++t > maxTicks || caught.isEmpty()) {
+                    cancel();
+                    return;
+                }
+                Location pl = p.getLocation();
+                double ty = pl.getY() - (p.isOnGround() ? 0.0 : 1.2);
+                for (LivingEntity le : caught) {
+                    if (!le.isValid() || le.isDead() || le.getWorld() != pl.getWorld()) {
+                        continue;
+                    }
+                    Location el = le.getLocation();
+                    Vector delta = new Vector(pl.getX() - el.getX(), ty - el.getY(), pl.getZ() - el.getZ());
+                    double d = delta.length();
+                    if (d < 0.7) {
+                        le.setVelocity(new Vector(0, Math.min(0.0, le.getVelocity().getY()), 0)); // arrived: stop
+                        continue;
+                    }
+                    double v = Math.min(speed, d * 0.45); // never faster than the distance left
+                    Vector vel = delta.normalize().multiply(v);
+                    if (le.isOnGround() && vel.getY() < 0.1) {
+                        vel.setY(0.1); // a little lift so they do not catch on the floor
+                    }
+                    le.setVelocity(vel);
+                    if (t % 3 == 1) {
+                        Fx.line(el.clone().add(0, le.getHeight() / 2.0, 0), pl.clone().add(0, 1, 0), 0.6,
+                                l -> Fx.dust(l, DEEP, 1.0f, 1, 0.02));
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
 
         Fx.sound(center, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.2f, 0.7f);
         Fx.sound(center, Sound.ENTITY_WARDEN_SONIC_CHARGE, 1.0f, 1.2f);

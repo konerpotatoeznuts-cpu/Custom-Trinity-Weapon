@@ -117,7 +117,8 @@ final class PlayerSettings implements Listener {
     private void refresh(UUID id, Map<String, String> m) {
         boolean r = false;
         for (Map.Entry<String, String> e : m.entrySet()) {
-            if ((e.getKey().startsWith("fx.") || e.getKey().equals("sounds")) && e.getValue().equals("0")) {
+            if (((e.getKey().startsWith("fx.") || e.getKey().equals("sounds")) && e.getValue().equals("0"))
+                    || (e.getKey().equals("perf.low") && e.getValue().equals("1"))) {
                 r = true;
                 break;
             }
@@ -198,11 +199,25 @@ final class PlayerSettings implements Listener {
     }
 
     /** Does this viewer want particles from this weapon? (weapon null = unknown source) */
+    private static final String[] FX_KEYS = new String[WeaponType.values().length];
+
+    static {
+        for (WeaponType t : WeaponType.values()) {
+            FX_KEYS[t.ordinal()] = "fx." + t.id();
+        }
+    }
+
     boolean particles(Player viewer, WeaponType weapon) {
-        if (!on(viewer, "fx.all")) {
+        Map<String, String> m = map(viewer);
+        if ("0".equals(m.get("fx.all"))) {
             return false;
         }
-        return weapon == null || on(viewer, "fx." + weapon.id());
+        return weapon == null || !"0".equals(m.get(FX_KEYS[weapon.ordinal()]));
+    }
+
+    /** Low-FPS mode (off unless the player turns it on): this player is sent fewer, closer particles. */
+    boolean lowFx(Player p) {
+        return anyRestriction && "1".equals(map(p).get("perf.low"));
     }
 
     // ------------------------------------------------------------------ lifecycle

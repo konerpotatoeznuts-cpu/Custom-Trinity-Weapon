@@ -101,6 +101,7 @@ final class SettingsMenu implements Listener {
         inv.setItem(1, toggle(Material.FIREWORK_STAR, "All weapon particles", st.on(p, "fx.all"), "Master switch for what YOU see."));
         inv.setItem(3, toggle(Material.NOTE_BLOCK, "Weapon sounds", st.on(p, "sounds"), "Ability sounds you hear."));
         inv.setItem(5, toggle(Material.GLOWSTONE, "Flashbang screen", st.on(p, "flash.overlay"), "The white screen when flashed.", "Off = you still get the ringing and the slowdown."));
+        inv.setItem(8, toggle(Material.CLOCK, "Low-FPS mode", st.lowFx(p), "Fewer and closer particles for YOU only.", "Use it if the game stutters. Off = everything as designed."));
         inv.setItem(7, item(Material.BARRIER, name("Reset everything", NamedTextColor.RED), false, List.of(line("Back to the defaults."))));
 
         inv.setItem(10, colorItem("Spin color", st.spin(p)));
@@ -140,6 +141,7 @@ final class SettingsMenu implements Listener {
             case 3 -> st.toggle(p, "sounds");
             case 5 -> st.toggle(p, "flash.overlay");
             case 7 -> st.reset(p);
+            case 8 -> st.setOn(p, "perf.low", !st.lowFx(p));
             case 10 -> st.cycle(p, "color.spin", "blue", dir);
             case 11 -> st.cycle(p, "color.trail", "blue", dir);
             case 12 -> st.cycle(p, "color.electric", "yellow", dir);

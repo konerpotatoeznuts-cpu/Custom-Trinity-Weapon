@@ -334,8 +334,8 @@ final class SmokeGrenadeAbility extends Ability {
 
     /** The cloud fills the air around the pop like a liquid: it spreads around corners but never through walls. */
     private Cloud buildCloud(World w, Location c) {
-        double radius = num("smoke-radius", 3.6);
-        int cap = (int) num("max-voxels", 420);
+        double radius = num("smoke-radius", 4.4);
+        int cap = (int) num("max-voxels", 760);
         Cloud cl = new Cloud(w, c.toVector());
         cl.max = (int) (num("smoke-seconds", 18) * 20);
         cl.bloom = (int) Math.max(4, num("bloom-ticks", 20));
@@ -404,10 +404,12 @@ final class SmokeGrenadeAbility extends Ability {
         }
         if (c.age % 2 == 0) {
             double density = num("particle-density", 0.4);
-            int n = (int) Math.max(6, Math.min((int) num("max-particles-per-burst", 120), shown * density));
+            int n = (int) Math.max(6, Math.min((int) num("max-particles-per-burst", 170), shown * density));
             if (c.age < c.bloom) {
                 n *= 2;
             }
+            boolean scoped = Fx.beginHere();
+            try {
             for (int i = 0; i < n; i++) {
                 int[] v = c.voxels.get(rnd.nextInt(shown));
                 if (v[4] > c.age) {
@@ -416,6 +418,11 @@ final class SmokeGrenadeAbility extends Ability {
                 int g = 150 + rnd.nextInt(50);
                 Location l = new Location(c.w, v[0] + rnd.nextDouble(), v[1] + rnd.nextDouble(), v[2] + rnd.nextDouble());
                 Fx.forceDust(l, Color.fromRGB(g, g, g + 4), 4.0f);
+            }
+            } finally {
+                if (scoped) {
+                    Fx.end();
+                }
             }
         }
         if (c.age % 10 == 0) {
@@ -438,7 +445,7 @@ final class SmokeGrenadeAbility extends Ability {
             }
         }
         Location mid = new Location(c.w, c.center.getX(), c.center.getY(), c.center.getZ());
-        double r = num("smoke-radius", 3.6);
+        double r = num("smoke-radius", 4.4);
         for (Entity en : c.w.getNearbyEntities(mid, r, r, r)) {
             if (en instanceof LivingEntity le && le.getFireTicks() > 0 && en.getLocation().distanceSquared(mid) <= r * r) {
                 le.setFireTicks(0);
@@ -460,7 +467,7 @@ final class SmokeGrenadeAbility extends Ability {
         if (clouds.isEmpty() || w == null) {
             return;
         }
-        double reach = num("smoke-radius", 3.6) + radius + 1;
+        double reach = num("smoke-radius", 4.4) + radius + 1;
         Vector mid = a.clone().add(b).multiply(0.5);
         double half = a.distance(b) / 2;
         int hold = (int) (seconds * 20);

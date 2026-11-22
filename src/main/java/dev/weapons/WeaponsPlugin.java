@@ -34,6 +34,7 @@ public final class WeaponsPlugin extends JavaPlugin {
     private FlashOverlay flash;
     private Immobilize immobilize;
     private PlayerSettings settings;
+    private CrossPvp crossPvp;
     private SettingsMenu menu;
 
     @Override
@@ -85,6 +86,9 @@ public final class WeaponsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(settings, this);
         getServer().getPluginManager().registerEvents(menu, this);
         settings.loadOnline();
+        crossPvp = new CrossPvp(this);
+        getServer().getPluginManager().registerEvents(crossPvp, this);
+        crossPvp.start();
         getServer().getPluginManager().registerEvents(new Deaths(this), this);
         getServer().getPluginManager().registerEvents(new WeaponListener(this), this);
         getServer().getPluginManager().registerEvents(new RestrictionListener(this), this);
@@ -103,6 +107,9 @@ public final class WeaponsPlugin extends JavaPlugin {
         }
         if (flash != null) {
             flash.shutdown();
+            if (crossPvp != null) {
+                crossPvp.shutdown();
+            }
             ModelAnim.shutdown();
         }
         if (qte != null) {
