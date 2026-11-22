@@ -118,3 +118,13 @@ Bedrock has no attack cooldown and its axes hit one point below the same-tier sw
 ### Performance
 
 Particles, sounds and effects are exactly as before, but cheaper to send: one player list per world per tick is shared by every effect, looping effects (rings, lines, smoke clouds) find their weapon once instead of per particle, and settings lookups no longer build strings. Players who get low FPS can switch on **Low-FPS mode** in `/weapon config` (clock icon): only that player gets fewer, closer particles. It is off by default.
+
+
+## New items
+
+- **AK-47 Magazine** (iron nugget, stacks to 16): there is an **empty** magazine and a loaded one, and each remembers its rounds (0-30). Craft an empty one with **8 iron ingots in a ring**. **Right-click** a magazine to load 1 arrow from your inventory, **sneak + right-click** to load 5. Reloading the AK-47 uses the fullest magazines first, then loose arrows, and the used magazine comes back empty (or with the rounds the gun did not need). `/weapon give <player> magazine [amount]` (full) or `empty_magazine`.
+- **Trinity Dihrama** (magma cream): right-click, and the whole server is told who used it and where (X Y Z). For 24 real hours (`dihrama.duration-hours: 24`, also counting while offline) the user has 20 hearts, Speed III, Strength III, and every villager trade is free (what it cost comes straight back). While active the player holds the permission `trinity.dihrama.active` (also set in LuckPerms), which a kill shop plugin can use to make items free. `/weapon give <player> dihrama [amount]`.
+
+## Bullets
+
+Java players see a real 3D bullet model fly down AK-47 and revolver shots (resource pack, `bullets:` in config), and bullets leave holes in walls that fade after 25 seconds (`bullet-holes:`). Bedrock keeps the particle tracer and sees dark specks for holes.
