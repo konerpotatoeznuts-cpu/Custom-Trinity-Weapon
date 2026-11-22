@@ -242,6 +242,7 @@ final class Ak47Ability extends GunAbility {
                 break;
             }
             impact(b, hit, r);
+            plugin.bullets().hole(type(), new Location(w, hit.getX(), hit.getY(), hit.getZ()), r.getHitBlockFace());
             travelled += d;
             if (pens >= (int) num("max-penetrations", 2) || !thin(b) || !plugin.getConfig().getBoolean("weapons.ak47.wallbang", true)) {
                 break;
@@ -280,6 +281,7 @@ final class Ak47Ability extends GunAbility {
         for (double d = 1.5; d < tracer; d += 1.6) {
             Fx.dust(muzzle.clone().add(dir.clone().multiply(d)), Color.fromRGB(255, 225, 140), 0.7f, 1, 0);
         }
+        plugin.bullets().tracer(type(), muzzle, new Location(w, end.getX(), end.getY(), end.getZ()));
         Fx.disturbSmoke(start, new Location(w, end.getX(), end.getY(), end.getZ()), 0.7, 2.5);
         Fx.burst(muzzle, Particle.FLAME, 3, 0.04, 0.03);
         Fx.burst(muzzle, Particle.SMOKE, 2, 0.05, 0.01);

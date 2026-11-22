@@ -37,8 +37,26 @@ final class CrossPvp implements Listener {
     private final NamespacedKey speedKey;
     private BukkitTask keeper;
 
+    private static CrossPvp instance;
+
+    /**
+     * Bedrock nerf factor for something this entity does ("ability-damage-multiplier", "cooldown-multiplier"...).
+     * 1.0 for Java players, for non-players, and (when {@code against} is not a player and only-vs-players is on) for PvE.
+     */
+    static double factor(org.bukkit.entity.Entity who, org.bukkit.entity.Entity against, String key, double def) {
+        CrossPvp c = instance;
+        if (c == null || !(who instanceof Player p) || !c.on() || !c.bedrockRules(p)) {
+            return 1.0;
+        }
+        if (against != null && !(against instanceof Player) && c.plugin.getConfig().getBoolean("pvp.bedrock.only-vs-players", true)) {
+            return 1.0;
+        }
+        return c.plugin.getConfig().getDouble("pvp.bedrock." + key, def);
+    }
+
     CrossPvp(WeaponsPlugin plugin) {
         this.plugin = plugin;
+        instance = this;
         this.speedKey = new NamespacedKey(plugin, "bedrock_attack_speed");
     }
 
@@ -125,6 +143,19 @@ final class CrossPvp implements Listener {
         }
     }
 
+    /** Arrows, tridents and other projectiles shot by a Bedrock player. */
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onProjectile(EntityDamageByEntityEvent e) {
+        if (!on() || Combat.isInternal() || !(e.getDamager() instanceof org.bukkit.entity.Projectile pr)
+                || !(pr.getShooter() instanceof Player p)) {
+            return;
+        }
+        double f = factor(p, e.getEntity(), "projectile-multiplier", 0.85);
+        if (f != 1.0) {
+            e.setDamage(e.getDamage() * f);
+        }
+    }
+
     // ------------------------------------------------------------------ keeping Bedrock fighters fair against Java
 
     private final java.util.Map<java.util.UUID, Integer> lastHit = new java.util.HashMap<>();
@@ -137,9 +168,24 @@ final class CrossPvp implements Listener {
      *    its Java damage per second). A well-timed hit is always full damage.
      */
     private void balance(Player p, EntityDamageByEntityEvent e) {
-        double f = plugin.getConfig().getDouble("pvp.bedrock.damage-multiplier", 1.0);
+        double f = plugin.getConfig().getDouble("pvp.bedrock.damage-multiplier", 0.9);
         ItemStack item = p.getInventory().getItemInMainHand();
-        if (plugin.items().identify(item) == null) { // custom weapons have their own damage numbers
+        boolean pvp = e.getEntity() instanceof Player;
+        if (!pvp && plugin.getConfig().getBoolean("pvp.bedrock.only-vs-players", true)) {
+            return; // against mobs Bedrock players fight at full strength
+        }
+        if (plugin.items().identify(item) != null) {
+            // custom weapons: their own damage numbers, nerfed for Bedrock, with the same anti-spam rule as a sword
+            f *= plugin.getConfig().getDouble("pvp.bedrock.weapon-melee-multiplier", 0.6);
+            if (plugin.getConfig().getBoolean("pvp.bedrock.spam-balance", true) && e.getEntity() instanceof LivingEntity victim
+                    && victim.getNoDamageTicks() <= victim.getMaximumNoDamageTicks() / 2.0f) {
+                int now = Bukkit.getCurrentTick();
+                Integer last = lastHit.put(p.getUniqueId(), now);
+                if (last != null) {
+                    f *= Math.max(plugin.getConfig().getDouble("pvp.bedrock.spam-floor", 0.6), Math.min(1.0, (now - last) / 12.5));
+                }
+            }
+        } else {
             String n = item.getType().name();
             if (n.endsWith("_AXE") && plugin.getConfig().getBoolean("pvp.bedrock.axe-one-behind-sword", true)) {
                 f *= axeRatio(n);

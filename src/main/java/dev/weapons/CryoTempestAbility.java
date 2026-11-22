@@ -157,7 +157,7 @@ final class CryoTempestAbility extends Ability {
         }
 
         /** Hits on the stand-in body hurt the real player (who is a safe spectator while flying). */
-        @EventHandler(priority = org.bukkit.event.EventPriority.HIGH)
+        @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST)
         public void onDecoyDamage(EntityDamageEvent e) {
             UUID owner = decoyOwner.get(e.getEntity().getUniqueId());
             if (owner == null) {
@@ -433,6 +433,16 @@ final class CryoTempestAbility extends Ability {
 
             @Override
             public void run() {
+                try {
+                    step();
+                } catch (Throwable ex) {
+                    plugin.getLogger().warning("Cryo Tempest pilot stopped by an error: " + ex);
+                    ex.printStackTrace();
+                    finish();
+                }
+            }
+
+            private void step() {
                 if (!p.isOnline() || p.isDead() || !arrow.isValid() || arrow.isInBlock() || arrow.isOnGround() || t++ > maxTicks) {
                     finish();
                     return;
@@ -525,8 +535,13 @@ final class CryoTempestAbility extends Ability {
             private void finish() {
                 cancel();
                 flights.remove(p.getUniqueId(), f);
-                if (fp && p.isOnline()) {
-                    endFirstPerson(p);
+                if (fp) {
+                    if (p.isOnline()) {
+                        endFirstPerson(p);
+                    } else {
+                        riding.remove(p.getUniqueId());
+                        removeDecoy(p.getUniqueId());
+                    }
                 }
                 if (exploded) {
                     arrow.remove();
@@ -566,12 +581,37 @@ final class CryoTempestAbility extends Ability {
         }
         Location o = p.getLocation();
         riding.put(p.getUniqueId(), new Saved(p.getGameMode(), o.clone(), p.getFlySpeed(), p.getAllowFlight(), p.isFlying()));
-        p.getPersistentDataContainer().set(stateKey, PersistentDataType.STRING,
-                p.getGameMode().name() + ";" + p.getFlySpeed() + ";" + o.getWorld().getUID() + ";" + o.getX() + ";" + o.getY() + ";" + o.getZ());
-        spawnDecoy(p, o);
-        p.setGameMode(GameMode.SPECTATOR);
-        p.setFlySpeed(0f);
-        return true;
+        try {
+            p.getPersistentDataContainer().set(stateKey, PersistentDataType.STRING,
+                    p.getGameMode().name() + ";" + p.getFlySpeed() + ";" + o.getWorld().getUID() + ";" + o.getX() + ";" + o.getY() + ";" + o.getZ());
+            spawnDecoy(p, o);
+            p.setGameMode(GameMode.SPECTATOR);
+            if (p.getGameMode() != GameMode.SPECTATOR) {
+                throw new IllegalStateException("another plugin refused the game mode change to spectator");
+            }
+            p.setFlySpeed(0f);
+            return true;
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Cryo Tempest first-person pilot could not start (steering from your own body instead): " + t);
+            t.printStackTrace();
+            abortFirstPerson(p);
+            return false;
+        }
+    }
+
+    /** Undoes a first-person start that failed half way. */
+    private void abortFirstPerson(Player p) {
+        removeDecoy(p.getUniqueId());
+        Saved s = riding.remove(p.getUniqueId());
+        p.getPersistentDataContainer().remove(stateKey);
+        if (s != null) {
+            try {
+                p.setGameMode(s.mode());
+                p.setFlySpeed(s.flySpeed());
+            } catch (Throwable ignored) {
+                // nothing more to do
+            }
+        }
     }
 
     /** Keeps the camera on the arrow (the eye sits on the arrow, the view direction is left alone). */
@@ -580,8 +620,14 @@ final class CryoTempestAbility extends Ability {
             p.setSpectatorTarget(null); // a stray click must not hand the camera to another entity
         }
         Location to = new Location(arrow.getWorld(), arrow.getX(), arrow.getY() - p.getEyeHeight(), arrow.getZ(), 0f, 0f);
-        p.teleport(to, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.Relative.YAW, TeleportFlag.Relative.PITCH);
+        if (!p.teleport(to, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.Relative.YAW, TeleportFlag.Relative.PITCH)
+                && !warnedTp) {
+            warnedTp = true;
+            plugin.getLogger().warning("Cryo Tempest: moving the camera to the arrow was refused (another plugin cancelled the teleport?)");
+        }
     }
+
+    private boolean warnedTp;
 
     /** A stand-in body: a mannequin wearing the player's skin and armor (an armor stand if the mannequin is not available). */
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -619,28 +665,48 @@ final class CryoTempestAbility extends Ability {
                 a.setBasePlate(false);
             });
         }
-        d.setPersistent(false);
-        d.setSilent(true);
-        d.setRemoveWhenFarAway(false);
-        try {
-            d.setAI(false);
-        } catch (Throwable ignored) {
-            // armor stands have no AI
-        }
-        d.customName(net.kyori.adventure.text.Component.text(p.getName()));
-        d.setCustomNameVisible(true);
-        org.bukkit.inventory.EntityEquipment eq = d.getEquipment();
-        if (eq != null) {
-            eq.setArmorContents(p.getInventory().getArmorContents());
-            eq.setItemInMainHand(p.getInventory().getItemInMainHand().clone());
-            eq.setHelmetDropChance(0f);
-            eq.setChestplateDropChance(0f);
-            eq.setLeggingsDropChance(0f);
-            eq.setBootsDropChance(0f);
-            eq.setItemInMainHandDropChance(0f);
-        }
+        // register it FIRST, so whatever happens below it can always be found, damaged and removed again
         decoys.put(p.getUniqueId(), d);
         decoyOwner.put(d.getUniqueId(), p.getUniqueId());
+        final LivingEntity dec = d;
+        guard(() -> dec.setInvulnerable(false)); // a mannequin is invulnerable by default: that is why hits did nothing
+        guard(() -> dec.setPersistent(false));
+        guard(() -> dec.setSilent(true));
+        guard(() -> dec.setRemoveWhenFarAway(false));
+        guard(() -> dec.setAI(false)); // armor stands have no AI
+        guard(() -> dec.customName(net.kyori.adventure.text.Component.text(p.getName())));
+        guard(() -> dec.setCustomNameVisible(true));
+        guard(() -> {
+            org.bukkit.inventory.EntityEquipment eq = dec.getEquipment();
+            if (eq != null) {
+                eq.setArmorContents(p.getInventory().getArmorContents());
+                eq.setItemInMainHand(p.getInventory().getItemInMainHand().clone());
+                eq.setHelmetDropChance(0f);
+                eq.setChestplateDropChance(0f);
+                eq.setLeggingsDropChance(0f);
+                eq.setBootsDropChance(0f);
+                eq.setItemInMainHandDropChance(0f);
+            }
+        });
+        // never lingers: gone after the longest possible flight plus a little
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (decoys.get(p.getUniqueId()) == dec) {
+                Player pl = plugin.getServer().getPlayer(p.getUniqueId());
+                if (pl != null && riding.containsKey(p.getUniqueId())) {
+                    endFirstPerson(pl);
+                } else {
+                    removeDecoy(p.getUniqueId());
+                }
+            }
+        }, (long) (num("pilot-seconds", 6.0) * 20) + 40L);
+    }
+
+    private void guard(Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            // a detail of the decoy that this server version does not support
+        }
     }
 
     private void removeDecoy(UUID player) {

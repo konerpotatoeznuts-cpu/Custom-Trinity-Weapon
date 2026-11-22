@@ -74,6 +74,33 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
             return;
         }
         String name = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+        // the two non-weapon items: /weapon give <player> magazine [amount]  and  /weapon give <player> dihrama [amount]
+        String[] parts = name.trim().split("\\s+");
+        String first = parts[0].toLowerCase(Locale.ROOT);
+        if (first.equals("magazine") || first.equals("ak47_magazine") || first.equals("empty_magazine") || first.equals("dihrama") || first.equals("trinity_dihrama")) {
+            int amount = 1;
+            if (parts.length > 1) {
+                try {
+                    amount = Math.max(1, Math.min(64, Integer.parseInt(parts[parts.length - 1])));
+                } catch (NumberFormatException ignored) {
+                    // one
+                }
+            }
+            boolean mag = first.contains("magazine");
+            ItemStack stack = mag ? plugin.magazines().create(first.equals("empty_magazine") ? 0 : plugin.magazines().capacity()) : plugin.dihrama().create(amount);
+            if (mag) {
+                stack.setAmount(Math.min(16, amount));
+            }
+            for (ItemStack left : target.getInventory().addItem(stack).values()) {
+                target.getWorld().dropItemNaturally(target.getLocation(), left);
+            }
+            String label2 = mag ? (first.equals("empty_magazine") ? "Empty AK-47 Magazine" : "AK-47 Magazine") : "Trinity Dihrama";
+            sender.sendMessage(Component.text("Gave " + amount + "x " + label2 + " to " + target.getName() + ".", NamedTextColor.GREEN));
+            if (!sender.equals(target)) {
+                target.sendMessage(Component.text("You received " + amount + "x " + label2 + ".", NamedTextColor.GOLD));
+            }
+            return;
+        }
         WeaponType type = WeaponType.parse(name);
         if (type == null) {
             sender.sendMessage(Component.text("Unknown weapon '" + name + "'. Use /" + label + " list.", NamedTextColor.RED));
@@ -144,6 +171,11 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
             for (WeaponType t : WeaponType.values()) {
                 if (t.id().startsWith(args[2].toLowerCase(Locale.ROOT))) {
                     out.add(t.id());
+                }
+            }
+            for (String extra : List.of("magazine", "empty_magazine", "dihrama")) {
+                if (extra.startsWith(args[2].toLowerCase(Locale.ROOT))) {
+                    out.add(extra);
                 }
             }
         }

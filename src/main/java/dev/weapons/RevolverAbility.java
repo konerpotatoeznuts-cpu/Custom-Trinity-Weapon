@@ -210,6 +210,7 @@ final class RevolverAbility extends Ability {
         arrow.setGravity(false);
         arrow.setDamage(num("bullet-damage", 4.0) * Combat.strength(p));
         arrow.getPersistentDataContainer().set(plugin.bulletKey(), PersistentDataType.BYTE, (byte) 1);
+        plugin.bullets().follow(type(), arrow);
 
         // bullet trail, and the bullet disappears after 3 seconds
         new BukkitRunnable() {

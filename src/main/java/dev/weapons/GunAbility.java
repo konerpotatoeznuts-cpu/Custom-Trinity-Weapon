@@ -80,7 +80,7 @@ abstract class GunAbility extends Ability {
 
     protected int reserve(Player p) {
         Material m = ammoMaterial();
-        int n = 0;
+        int n = type() == WeaponType.AK47 && plugin.magazines().enabled() ? plugin.magazines().totalRounds(p) : 0;
         for (ItemStack s : p.getInventory().getStorageContents()) {
             if (s != null && s.getType() == m) {
                 n += s.getAmount();
@@ -92,6 +92,9 @@ abstract class GunAbility extends Ability {
     private int takeReserve(Player p, int need) {
         Material m = ammoMaterial();
         int remaining = need;
+        if (type() == WeaponType.AK47 && plugin.magazines().enabled()) {
+            remaining = plugin.magazines().take(p, remaining); // magazines first, loose arrows after
+        }
         ItemStack[] contents = p.getInventory().getStorageContents();
         for (int i = 0; i < contents.length && remaining > 0; i++) {
             ItemStack s = contents[i];

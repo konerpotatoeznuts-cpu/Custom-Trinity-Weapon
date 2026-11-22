@@ -67,6 +67,7 @@ final class SonicShoesAbility extends Ability {
         boolean ballAir;             // the current airborne spin is a ball (jump / roll off a ledge)
         SpinBall ball;
         boolean hidSelf;
+        int noBall;                  // ticks since the ball form last applied (the ball stays a few ticks so it never flickers)
         Vector lastDir = new Vector(0, 0, 1);
         int ticks;
         Vector wallDir = new Vector(0, 0, 1);
@@ -678,6 +679,13 @@ final class SonicShoesAbility extends Ability {
         PlayerSettings.Palette spin = st.spin(p);
 
         if (ball) {
+            s.noBall = 0;
+        } else if (s.ball != null) {
+            s.noBall++;
+        }
+        // A one-tick slip out of ball form (a bump, a sneak glitch, ground contact flickering) must not show the normal body
+        boolean keep = ball || (s.ball != null && s.ball.valid() && s.noBall < 4 && st.on(p, "sonic.ball"));
+        if (keep) {
             if (s.ball == null || !s.ball.valid()) {
                 if (s.ball != null) {
                     s.ball.remove();
@@ -783,7 +791,9 @@ final class SonicShoesAbility extends Ability {
                 org.bukkit.inventory.EquipmentSlot.LEGS, org.bukkit.inventory.EquipmentSlot.FEET,
                 org.bukkit.inventory.EquipmentSlot.HAND, org.bukkit.inventory.EquipmentSlot.OFF_HAND};
         for (Player v : p.getWorld().getPlayers()) {
-            if (v.getLocation().distanceSquared(p.getLocation()) > 80 * 80) {
+            // Never to the player themselves: their own client applies it to their REAL inventory, which blanked the
+            // held slot and left the wrong item behind when they switched slots mid-spin.
+            if (v.equals(p) || v.getLocation().distanceSquared(p.getLocation()) > 80 * 80) {
                 continue;
             }
             for (org.bukkit.inventory.EquipmentSlot sl : slots) {
@@ -808,6 +818,7 @@ final class SonicShoesAbility extends Ability {
         }
         s.hidSelf = false;
         sendEquipment(p, true);
+        p.updateInventory(); // repairs any slot an earlier version blanked on the client
         Fx.burst(p.getLocation().add(0, 0.6, 0), Particle.POOF, 10, 0.3, 0.1);
     }
 

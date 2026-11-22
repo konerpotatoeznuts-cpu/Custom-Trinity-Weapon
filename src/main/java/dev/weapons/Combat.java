@@ -63,7 +63,7 @@ final class Combat {
         if (source.getCausingEntity() instanceof Player killer) {
             Deaths.record(target, killer, Fx.currentWeapon());
         }
-        double total = amount * damageMult;
+        double total = amount * damageMult * CrossPvp.factor(source.getCausingEntity(), target, "ability-damage-multiplier", 0.6);
         double pierce = total * pierceShare;
         double normal = total - pierce;
         boolean prev = internal;
@@ -83,6 +83,7 @@ final class Combat {
 
     /** Armor-ignoring (magic) damage credited to the same attacker. No multipliers. */
     static void pierce(LivingEntity target, double amount, Player source) {
+        amount *= CrossPvp.factor(source, target, "weapon-melee-multiplier", 0.6);
         Deaths.record(target, source, Fx.currentWeapon());
         boolean prev = internal;
         internal = true;

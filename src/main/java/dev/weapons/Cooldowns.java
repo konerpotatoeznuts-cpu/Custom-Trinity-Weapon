@@ -49,7 +49,7 @@ final class Cooldowns {
             Anim.ability(plugin, p, t, key);
         }
         expiry.computeIfAbsent(p.getUniqueId(), x -> new HashMap<>())
-                .put(k(t, key), System.currentTimeMillis() + (long) (seconds * 1000));
+                .put(k(t, key), System.currentTimeMillis() + (long) (seconds * 1000 * CrossPvp.factor(p, null, "cooldown-multiplier", 1.3)));
     }
 
     /** Starts the cooldown if ready. If not ready, tells the player how long is left. */

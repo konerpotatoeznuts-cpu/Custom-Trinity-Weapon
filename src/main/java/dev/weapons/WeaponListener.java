@@ -224,6 +224,9 @@ final class WeaponListener implements Listener {
     public void onProjectileHit(ProjectileHitEvent e) {
         if (e.getEntity() instanceof Arrow arrow
                 && arrow.getPersistentDataContainer().has(plugin.bulletKey(), PersistentDataType.BYTE)) {
+            if (e.getHitBlock() != null && e.getHitBlockFace() != null) {
+                plugin.bullets().hole(WeaponType.MEDUSAS_REVOLVER, arrow.getLocation(), e.getHitBlockFace());
+            }
             // Remove next tick so the damage from this hit is still applied
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (arrow.isValid()) {

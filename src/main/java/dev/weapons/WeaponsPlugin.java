@@ -35,6 +35,9 @@ public final class WeaponsPlugin extends JavaPlugin {
     private Immobilize immobilize;
     private PlayerSettings settings;
     private CrossPvp crossPvp;
+    private BulletFx bulletFx;
+    private AkMagazine magazines;
+    private TrinityDihrama dihrama;
     private SettingsMenu menu;
 
     @Override
@@ -86,6 +89,13 @@ public final class WeaponsPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(settings, this);
         getServer().getPluginManager().registerEvents(menu, this);
         settings.loadOnline();
+        magazines = new AkMagazine(this);
+        getServer().getPluginManager().registerEvents(magazines, this);
+        dihrama = new TrinityDihrama(this);
+        getServer().getPluginManager().registerEvents(dihrama, this);
+        dihrama.start();
+        bulletFx = new BulletFx(this);
+        bulletFx.start();
         crossPvp = new CrossPvp(this);
         getServer().getPluginManager().registerEvents(crossPvp, this);
         crossPvp.start();
@@ -107,6 +117,15 @@ public final class WeaponsPlugin extends JavaPlugin {
         }
         if (flash != null) {
             flash.shutdown();
+            if (magazines != null) {
+                magazines.shutdown();
+            }
+            if (dihrama != null) {
+                dihrama.shutdown();
+            }
+            if (bulletFx != null) {
+                bulletFx.shutdown();
+            }
             if (crossPvp != null) {
                 crossPvp.shutdown();
             }
@@ -135,6 +154,18 @@ public final class WeaponsPlugin extends JavaPlugin {
     }
 
     // ------------------------------------------------------------------ accessors
+
+    AkMagazine magazines() {
+        return magazines;
+    }
+
+    TrinityDihrama dihrama() {
+        return dihrama;
+    }
+
+    BulletFx bullets() {
+        return bulletFx;
+    }
 
     WeaponItems items() {
         return items;
