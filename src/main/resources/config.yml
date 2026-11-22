@@ -13,6 +13,23 @@ worldguard:
   # false = abilities still work there (e.g. on mobs); true = abilities are completely disabled in no-pvp areas.
   block-abilities-in-no-pvp: false
 
+# Cross-play PvP. The rules follow the ATTACKER's platform: Bedrock attackers fight with Bedrock rules, Java attackers with vanilla Java rules.
+pvp:
+  enabled: true
+  mode: auto                     # auto = by platform. java / bedrock = force one set of rules for everybody (handy for testing)
+  bedrock:
+    no-attack-cooldown: true     # spam clicking deals full damage, like Bedrock
+    no-sweep: true               # no sweeping-edge hits
+    damage-multiplier: 1.0       # scales all Bedrock melee damage on top of the balance rules below
+    axe-one-behind-sword: true   # an axe hits 1 below the same-tier sword (Java axes hit 7 / 9 / 10)
+    spam-balance: true           # hitting faster than the Java swing time scales damage down, so spam clicking can't beat a well-timed Java player
+    spam-floor: 0.6              # ...but never below this share of full damage
+    knockback:
+      enabled: true              # Bedrock-style fixed knockback (no Java sprint-hit bonus). Custom weapons keep their own knockback.
+      horizontal: 0.42
+      vertical: 0.36
+      per-enchant-level: 0.45
+
 damage:
   ability-multiplier: 2.5        # every ability's damage is multiplied by this
   armor-piercing-share: 0.6      # this share of ability damage ignores armor (full netherite no longer tickles)
@@ -52,6 +69,8 @@ weapons:
     dash-power: 2.4
     pull-cooldown: 60
     pull-radius: 12.0
+    pull-height: 24.0             # how far up and down the pull reaches
+    pull-ticks: 14                # how long targets are dragged (they stop once under you)
     pull-ground: 0.7
     pull-air: 1.6
     no-fall-seconds: 6          # fall damage immunity after a dash
@@ -260,12 +279,12 @@ weapons:
     elasticity: 0.45              # every bounce keeps this much speed
     roll-friction: 0.85           # per tick while rolling on the floor
     max-flight-seconds: 20
-    smoke-radius: 3.6             # blocks (144 units)
+    smoke-radius: 4.4             # blocks
     smoke-seconds: 18
     bloom-ticks: 20               # how fast the cloud expands
     particle-density: 0.4         # higher = thicker smoke, lower = easier on phones
-    max-particles-per-burst: 120
-    max-voxels: 420
+    max-particles-per-burst: 170
+    max-voxels: 760
     projectile-hole-radius: 1.1   # arrows, bullets, tridents, eggs... cut a hole this wide as they fly through the smoke
     hole-seconds: 3.0             # how long a hole takes to fill in
     explosion-hole-radius: 5.0    # TNT, creepers, wind charges (a bit smaller) clear this much smoke
@@ -339,6 +358,7 @@ weapons:
     pilot-blast-min: 2.5          # frost blast radius on hit (scales with draw)
     pilot-blast-max: 5.0
     pilot-seconds: 6
+    pilot-first-person: true      # your camera rides the arrow (Java only); false = steer from your own body
     slow-seconds: 3
     slow-level: 2
     freeze-ticks: 140
@@ -357,6 +377,7 @@ death-messages:
 animations:
   enabled: true
   ghost-weapon: true             # a ghost copy of the weapon performs each ability (Java players; per-player toggle in /weapons config)
+  follow-lead: 2.0               # ticks the ghost weapon leads the player by, so it does not trail behind when you move
   # BetterModel player animations (install BetterModel, put a player model in plugins/BetterModel/players/).
   # The animation names inside the model are  <weapon id>_<event>, for example:
   #   halberd_of_despair_spin, excalibur_uppercut, excalibur_slash, durandal_beam, sea_truncheon_tsunami,
