@@ -20,13 +20,18 @@ pvp:
   bedrock:
     no-attack-cooldown: true     # spam clicking deals full damage, like Bedrock
     no-sweep: true               # no sweeping-edge hits
-    damage-multiplier: 1.0       # scales all Bedrock melee damage on top of the balance rules below
+    only-vs-players: true        # the nerfs below only apply when the victim is a player (mobs and bosses are fought at full strength)
+    damage-multiplier: 0.9       # all Bedrock melee damage
+    weapon-melee-multiplier: 0.6 # custom weapon swings (and the armor-piercing part of them)
+    ability-damage-multiplier: 0.6  # every custom weapon ability, gun and rocket
+    projectile-multiplier: 0.85  # bows, crossbows, tridents
+    cooldown-multiplier: 1.3     # custom weapon ability cooldowns are this much longer
     axe-one-behind-sword: true   # an axe hits 1 below the same-tier sword (Java axes hit 7 / 9 / 10)
     spam-balance: true           # hitting faster than the Java swing time scales damage down, so spam clicking can't beat a well-timed Java player
     spam-floor: 0.6              # ...but never below this share of full damage
     knockback:
       enabled: true              # Bedrock-style fixed knockback (no Java sprint-hit bonus). Custom weapons keep their own knockback.
-      horizontal: 0.42
+      horizontal: 0.38
       vertical: 0.36
       per-enchant-level: 0.45
 
@@ -362,6 +367,34 @@ weapons:
     slow-seconds: 3
     slow-level: 2
     freeze-ticks: 140
+
+# AK-47 Magazines (iron nuggets, stack to 16). Craft an EMPTY magazine with 8 iron ingots in a ring. Right-click a magazine to load
+# 1 arrow into it, sneak + right-click to load 5 (it holds weapons.ak47.magazine rounds). The AK-47 reloads from magazines first.
+magazine:
+  enabled: true
+
+# Trinity Dihrama (magma cream): /weapon give <player> dihrama
+dihrama:
+  duration-hours: 24             # REAL hours (counts while offline too)
+  extra-health: 20.0             # +20 health = 20 hearts in total
+  speed-level: 3
+  strength-level: 3
+  free-trades: true              # villager and wandering trader trades cost nothing
+  announce: true                 # tells everyone who used it and where
+  keep-on-death: true            # the effects come back after dying until the time runs out
+  luckperms-permission: true     # also sets trinity.dihrama.active in LuckPerms while it lasts (for the kill shop)
+
+# Bullet visuals
+bullets:
+  java-models: true              # Java players see a real 3D bullet model fly down AK-47 / revolver shots (needs the resource pack, see packs). Bedrock keeps the particle tracers.
+  tracer-scale: 1.6
+  tracer-speed: 7.0              # blocks per tick the tracer model appears to fly
+  max-live-tracers: 60
+bullet-holes:
+  enabled: true                  # bullets leave holes in walls that fade away
+  seconds: 25
+  max: 100                       # oldest holes go first
+  size: 0.17                     # blocks
 
 death-messages:
   enabled: true                   # weapon-specific chat messages when an ability kills someone
