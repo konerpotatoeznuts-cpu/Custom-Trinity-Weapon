@@ -97,3 +97,24 @@ Install BetterModel, put a player model (Blockbench, like the `steve.bbmodel` Be
 `sonic_shoes_spin_dash_launch`, ... The plugin plays them on the player with BetterModel's API (nothing to install on the
 plugin side, it finds BetterModel by itself). Missing animation = the built-in ghost weapon plays instead.
 Test one by hand (op): `/bettermodel play weapons ak47_reload`. Settings under `animations.bettermodel` in config.yml.
+
+
+## Cross-play PvP (Bedrock vs Java)
+
+The rules follow the **attacker's** platform (Floodgate UUID), set under `pvp:` in `config.yml`.
+
+- Bedrock attackers: no attack cooldown (spam clicking deals full damage), no sweeping hits, Bedrock-style fixed knockback.
+- Java attackers: vanilla Java PvP (cooldown, sweeping, sprint knockback, crits).
+- Custom weapons are linked in: a Bedrock player swinging one gets full-damage hits with no cooldown wait, and the weapon's own knockback and abilities are untouched.
+- `pvp.mode: java` or `bedrock` forces one ruleset for everybody (for testing). `pvp.bedrock.damage-multiplier` balances spam clicking.
+
+### Bedrock balance
+
+Bedrock has no attack cooldown and its axes hit one point below the same-tier sword, so `pvp.bedrock` also applies:
+- `axe-one-behind-sword`: an axe deals (sword damage - 1) instead of Java's 7 / 9 / 10.
+- `spam-balance` + `spam-floor`: swinging faster than the weapon's Java swing time scales damage down (never below the floor), so a sword spammed at the 10-tick hit gap deals 80% per hit, the same damage per second as a Java player timing hits. Timed hits are always full damage.
+- Custom weapons keep their own damage numbers.
+
+### Performance
+
+Particles, sounds and effects are exactly as before, but cheaper to send: one player list per world per tick is shared by every effect, looping effects (rings, lines, smoke clouds) find their weapon once instead of per particle, and settings lookups no longer build strings. Players who get low FPS can switch on **Low-FPS mode** in `/weapon config` (clock icon): only that player gets fewer, closer particles. It is off by default.
