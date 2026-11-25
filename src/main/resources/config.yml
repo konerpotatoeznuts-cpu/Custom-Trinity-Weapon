@@ -19,6 +19,7 @@ pvp:
   mode: auto                     # auto = by platform. java / bedrock = force one set of rules for everybody (handy for testing)
   bedrock:
     no-attack-cooldown: true     # spam clicking deals full damage, like Bedrock
+    respect-immunity: true       # hits inside the victim's damage-immunity window (first 10 ticks after a hit) do nothing, so click spam cannot kill faster than Java
     no-sweep: true               # no sweeping-edge hits
     only-vs-players: true        # the nerfs below only apply when the victim is a player (mobs and bosses are fought at full strength)
     damage-multiplier: 0.9       # all Bedrock melee damage
@@ -69,6 +70,22 @@ weapons:
     crater-radius: 2.5
     crater-max-blocks: 40
     crater-max-hardness: 30
+    # --- combo: hits in a row (no pause, not standing on the ground) make it easier to hit and unlock perks ---
+    combo-window: 3.0             # seconds allowed between hits
+    combo-ground-seconds: 1.0     # standing on the ground this long ends the combo
+    combo-reach: 3.0              # near-miss help: base reach ...
+    combo-reach-per-hit: 0.2      # ... plus this per hit
+    combo-cone: 8.0               # degrees of forgiveness ...
+    combo-cone-per-hit: 2.5       # ... plus this per hit
+    combo-assist-max-hits: 12
+    combo-big-hits: 3             # bigger crater and more shockwave chance
+    combo-proc-bonus: 0.30
+    combo-crater-scale: 1.5
+    combo-stun-hits: 7            # stuns the target
+    combo-stun-seconds: 1.5
+    combo-stun-cooldown: 4.0
+    combo-dive-hits: 10           # sneak in mid-air to fall faster
+    combo-dive-speed: 2.2
     proc-damage: 2.0            # 2.0 = 1 heart
     dash-cooldown: 20
     dash-power: 2.4
@@ -159,6 +176,27 @@ weapons:
     uppercut-angle: 120         # width of the fan in degrees
     uppercut-damage: 6.0        # 6.0 = 3 hearts
     uppercut-launch: 1.0        # how high targets are launched
+    # --- Ground Slash: double sneak in the air (needs this much height), slam down, stun + bleed ---
+    slam-min-height: 4.0
+    slam-double-sneak-ms: 450
+    slam-cooldown: 30
+    slam-speed: 2.4
+    slam-radius: 6.0
+    slam-damage: 6.0
+    slam-damage-per-block: 0.25   # extra damage per block of height
+    slam-max-damage: 14.0
+    slam-stun-seconds: 2.0
+    slam-crater: true
+    slam-crater-radius: 3.0
+    slam-crater-max-blocks: 50
+    slam-crater-max-hardness: 30
+    bleed-seconds: 20
+    bleed-damage: 0.4             # per second
+    bleed-per-hit: 0.25           # extra per second for every hit the victim takes while bleeding
+    bleed-max-stacks: 12
+    bleed-max-tick: 6.0
+    blood-trail-seconds: 8
+    blood-trail-max: 40
 
   fantasy_tamer:
     material: STICK
@@ -364,6 +402,7 @@ weapons:
     pilot-blast-max: 5.0
     pilot-seconds: 6
     pilot-first-person: true      # your camera rides the arrow (Java only); false = steer from your own body
+    pilot-camera-offset: 1.0      # how far below the arrow the invisible seat sits (raise it if the camera looks too low)
     slow-seconds: 3
     slow-level: 2
     freeze-ticks: 140
@@ -374,6 +413,14 @@ magazine:
   enabled: true
 
 # Trinity Dihrama (magma cream): /weapon give <player> dihrama
+trident-smash:                   # the mace smash for a plain trident, ONLY while riptiding
+  enabled: true
+  min-height: 3.0                # blocks above the ground/water needed
+  damage-per-block: 0.8
+  max-damage: 12.0
+  shockwave-radius: 3.0
+  heavy-height: 7.0
+
 dihrama:
   duration-hours: 24             # REAL hours (counts while offline too)
   extra-health: 20.0             # +20 health = 20 hearts in total
