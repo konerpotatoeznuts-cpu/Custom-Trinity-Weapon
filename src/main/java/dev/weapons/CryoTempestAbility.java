@@ -71,14 +71,15 @@ final class CryoTempestAbility extends Ability {
     private final Map<UUID, Flight> flights = new HashMap<>();
     private final Map<UUID, Long> lastSneak = new HashMap<>();
     private final Random rnd = new Random();
-    /** Players currently riding their arrow in first person (their body is parked, they are in spectator mode). */
+    /** Players currently riding their arrow in first person (their body is parked, they sit on an invisible seat that follows the arrow). */
     private final Map<UUID, Saved> riding = new HashMap<>();
+    private final Map<UUID, ArmorStand> seats = new HashMap<>();
     private final NamespacedKey stateKey;
     /** The stand-in body left where the player was, and which player it belongs to (by the decoy's uuid). */
     private final Map<UUID, LivingEntity> decoys = new HashMap<>();
     private final Map<UUID, UUID> decoyOwner = new HashMap<>();
 
-    private record Saved(GameMode mode, Location origin, float flySpeed, boolean allowFlight, boolean flying) {
+    private record Saved(Location origin, boolean invulnerable) {
     }
 
     CryoTempestAbility(WeaponsPlugin plugin) {
@@ -134,7 +135,7 @@ final class CryoTempestAbility extends Ability {
             frostTrail(arrow, 100);
         }
 
-        /** A crash or restart in the middle of a flight leaves the player in spectator mode: put them back. */
+        /** A crash or restart in the middle of a flight leaves the player invulnerable far from home: put them back. */
         @EventHandler
         public void onJoin(PlayerJoinEvent e) {
             Player p = e.getPlayer();
@@ -145,14 +146,21 @@ final class CryoTempestAbility extends Ability {
             p.getPersistentDataContainer().remove(stateKey);
             try {
                 String[] a = st.split(";");
-                p.setGameMode(GameMode.valueOf(a[0]));
-                p.setFlySpeed(Float.parseFloat(a[1]));
-                World w = plugin.getServer().getWorld(UUID.fromString(a[2]));
+                World w = plugin.getServer().getWorld(UUID.fromString(a[0]));
+                p.setInvulnerable(Boolean.parseBoolean(a[4]));
                 if (w != null) {
-                    p.teleport(new Location(w, Double.parseDouble(a[3]), Double.parseDouble(a[4]), Double.parseDouble(a[5])));
+                    p.teleport(new Location(w, Double.parseDouble(a[1]), Double.parseDouble(a[2]), Double.parseDouble(a[3])));
                 }
             } catch (Throwable t) {
-                p.setGameMode(GameMode.SURVIVAL);
+                p.setInvulnerable(false);
+            }
+        }
+
+        /** The seat cannot be left with sneak while piloting (the flight ends it). */
+        @EventHandler(ignoreCancelled = true)
+        public void onDismount(org.bukkit.event.entity.EntityDismountEvent e) {
+            if (e.getEntity() instanceof Player pl && riding.containsKey(pl.getUniqueId()) && seats.get(pl.getUniqueId()) == e.getDismounted()) {
+                e.setCancelled(true);
             }
         }
 
@@ -422,7 +430,7 @@ final class CryoTempestAbility extends Ability {
         Fx.dustFade(arrow.getLocation(), FIRE, Color.WHITE, 1.8f, 12, 0.4);
 
         final World w0 = arrow.getWorld();
-        final boolean fp = startFirstPerson(p);
+        final boolean fp = startFirstPerson(p, arrow.getLocation());
         final Set<UUID> hit = new HashSet<>();
         new BukkitRunnable() {
             int t = 0;
@@ -571,25 +579,40 @@ final class CryoTempestAbility extends Ability {
     // ------------------------------------------------------------------ first-person camera on the arrow
 
     /**
-     * Puts the player's camera on the arrow: they go into spectator mode (no collisions, no damage, invisible) and are moved
-     * to the arrow every tick without touching their view, so the mouse still aims it.
+     * Puts the player's camera on the arrow: they sit on an invisible seat (a marker armor stand) that is moved to the arrow every
+     * tick. Because the player is only a passenger the server never "teleports" them, so their mouse still turns the camera.
      */
-    private boolean startFirstPerson(Player p) {
+    private boolean startFirstPerson(Player p, Location arrowLoc) {
         if (!plugin.getConfig().getBoolean("weapons.cryo_tempest.pilot-first-person", true) || FlashOverlay.isBedrock(p)
                 || riding.containsKey(p.getUniqueId())) {
             return false;
         }
         Location o = p.getLocation();
-        riding.put(p.getUniqueId(), new Saved(p.getGameMode(), o.clone(), p.getFlySpeed(), p.getAllowFlight(), p.isFlying()));
+        riding.put(p.getUniqueId(), new Saved(o.clone(), p.isInvulnerable()));
         try {
             p.getPersistentDataContainer().set(stateKey, PersistentDataType.STRING,
-                    p.getGameMode().name() + ";" + p.getFlySpeed() + ";" + o.getWorld().getUID() + ";" + o.getX() + ";" + o.getY() + ";" + o.getZ());
+                    o.getWorld().getUID() + ";" + o.getX() + ";" + o.getY() + ";" + o.getZ() + ";" + p.isInvulnerable());
             spawnDecoy(p, o);
-            p.setGameMode(GameMode.SPECTATOR);
-            if (p.getGameMode() != GameMode.SPECTATOR) {
-                throw new IllegalStateException("another plugin refused the game mode change to spectator");
+            Location at = seatSpot(arrowLoc);
+            ArmorStand seat = at.getWorld().spawn(at, ArmorStand.class, a -> {
+                a.setVisible(false);
+                a.setMarker(true);
+                a.setGravity(false);
+                a.setInvulnerable(true);
+                a.setPersistent(false);
+                a.setSilent(true);
+                a.setSmall(true);
+            });
+            seats.put(p.getUniqueId(), seat);
+            if (!seat.addPassenger(p)) {
+                throw new IllegalStateException("the seat could not be mounted (another plugin cancelled it?)");
             }
-            p.setFlySpeed(0f);
+            p.setInvulnerable(true);
+            for (Player other : plugin.getServer().getOnlinePlayers()) {
+                if (!other.equals(p)) {
+                    other.hidePlayer(plugin, p); // the decoy stands where the body was
+                }
+            }
             return true;
         } catch (Throwable t) {
             plugin.getLogger().warning("Cryo Tempest first-person pilot could not start (steering from your own body instead): " + t);
@@ -599,35 +622,33 @@ final class CryoTempestAbility extends Ability {
         }
     }
 
+    private Location seatSpot(Location arrow) {
+        double off = plugin.getConfig().getDouble("weapons.cryo_tempest.pilot-camera-offset", 1.0);
+        return new Location(arrow.getWorld(), arrow.getX(), arrow.getY() - off, arrow.getZ(), 0f, 0f);
+    }
+
     /** Undoes a first-person start that failed half way. */
     private void abortFirstPerson(Player p) {
-        removeDecoy(p.getUniqueId());
-        Saved s = riding.remove(p.getUniqueId());
-        p.getPersistentDataContainer().remove(stateKey);
+        Saved s = riding.get(p.getUniqueId());
         if (s != null) {
-            try {
-                p.setGameMode(s.mode());
-                p.setFlySpeed(s.flySpeed());
-            } catch (Throwable ignored) {
-                // nothing more to do
-            }
+            endFirstPerson(p);
+        } else {
+            removeDecoy(p.getUniqueId());
         }
+        p.getPersistentDataContainer().remove(stateKey);
     }
 
-    /** Keeps the camera on the arrow (the eye sits on the arrow, the view direction is left alone). */
+    /** Keeps the camera on the arrow (the seat carries the player, the view direction is left alone). */
     private void followArrow(Player p, Location arrow) {
-        if (p.getSpectatorTarget() != null) {
-            p.setSpectatorTarget(null); // a stray click must not hand the camera to another entity
+        ArmorStand seat = seats.get(p.getUniqueId());
+        if (seat == null || !seat.isValid()) {
+            return;
         }
-        Location to = new Location(arrow.getWorld(), arrow.getX(), arrow.getY() - p.getEyeHeight(), arrow.getZ(), 0f, 0f);
-        if (!p.teleport(to, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.Relative.YAW, TeleportFlag.Relative.PITCH)
-                && !warnedTp) {
-            warnedTp = true;
-            plugin.getLogger().warning("Cryo Tempest: moving the camera to the arrow was refused (another plugin cancelled the teleport?)");
+        seat.teleport(seatSpot(arrow), PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.EntityState.RETAIN_PASSENGERS);
+        if (!seat.getPassengers().contains(p)) {
+            seat.addPassenger(p); // knocked off by something: back on
         }
     }
-
-    private boolean warnedTp;
 
     /** A stand-in body: a mannequin wearing the player's skin and armor (an armor stand if the mannequin is not available). */
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -724,17 +745,21 @@ final class CryoTempestAbility extends Ability {
         }
         p.getPersistentDataContainer().remove(stateKey);
         removeDecoy(p.getUniqueId());
-        if (p.getSpectatorTarget() != null) {
-            p.setSpectatorTarget(null);
+        ArmorStand seat = seats.remove(p.getUniqueId());
+        if (seat != null) {
+            seat.eject();
+            seat.remove();
         }
-        p.setGameMode(s.mode());
-        p.setFlySpeed(s.flySpeed());
-        p.setAllowFlight(s.allowFlight());
-        p.setFlying(s.flying());
+        for (Player other : plugin.getServer().getOnlinePlayers()) {
+            if (!other.equals(p)) {
+                other.showPlayer(plugin, p);
+            }
+        }
+        p.setInvulnerable(s.invulnerable());
         Location o = s.origin().clone();
-        o.setYaw(0f);
-        o.setPitch(0f);
-        p.teleport(o, PlayerTeleportEvent.TeleportCause.PLUGIN, TeleportFlag.Relative.YAW, TeleportFlag.Relative.PITCH);
+        o.setYaw(p.getLocation().getYaw());
+        o.setPitch(p.getLocation().getPitch());
+        p.teleport(o, PlayerTeleportEvent.TeleportCause.PLUGIN);
         p.setFallDistance(0f);
         p.setVelocity(new Vector(0, 0, 0));
     }

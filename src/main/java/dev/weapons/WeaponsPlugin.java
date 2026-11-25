@@ -99,6 +99,7 @@ public final class WeaponsPlugin extends JavaPlugin {
         crossPvp = new CrossPvp(this);
         getServer().getPluginManager().registerEvents(crossPvp, this);
         crossPvp.start();
+        getServer().getPluginManager().registerEvents(new TridentSmash(this), this);
         getServer().getPluginManager().registerEvents(new Deaths(this), this);
         getServer().getPluginManager().registerEvents(new WeaponListener(this), this);
         getServer().getPluginManager().registerEvents(new RestrictionListener(this), this);

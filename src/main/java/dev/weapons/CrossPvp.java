@@ -139,6 +139,13 @@ final class CrossPvp implements Listener {
             return;
         }
         if (e.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
+            // Bedrock has no attack cooldown, so clicking is not limited: a hit inside the victim's damage-immunity window
+            // is simply ignored, exactly as the Java swing timer would have prevented it.
+            if (plugin.getConfig().getBoolean("pvp.bedrock.respect-immunity", true) && e.getEntity() instanceof LivingEntity v
+                    && v.getNoDamageTicks() > v.getMaximumNoDamageTicks() / 2.0f) {
+                e.setCancelled(true);
+                return;
+            }
             balance(p, e);
         }
     }

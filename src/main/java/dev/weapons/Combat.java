@@ -87,11 +87,20 @@ final class Combat {
         Deaths.record(target, source, Fx.currentWeapon());
         boolean prev = internal;
         internal = true;
+        // The extra armor-piercing part of a swing must not weaken the victim's damage immunity: rawPierce zeroes the
+        // immunity timer and leaves a tiny "last damage", which let the NEXT click through for almost full damage.
+        // So remember the real state of the main hit and put it back afterwards.
+        final int immune = target.getNoDamageTicks();
+        final double lastDamage = target.getLastDamage();
         try {
             rawPierce(target, amount, DamageSource.builder(org.bukkit.damage.DamageType.PLAYER_ATTACK)
                     .withCausingEntity(source).withDirectEntity(source).build());
         } finally {
             internal = prev;
+            if (target.isValid() && !target.isDead()) {
+                target.setNoDamageTicks(Math.max(immune, target.getNoDamageTicks()));
+                target.setLastDamage(Math.max(lastDamage, target.getLastDamage()));
+            }
         }
     }
 

@@ -51,6 +51,10 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.text("  " + t.displayName(), NamedTextColor.YELLOW)
                             .append(Component.text("  (" + t.id() + ")", NamedTextColor.GRAY)));
                 }
+                sender.sendMessage(Component.text("Items:", NamedTextColor.GOLD));
+                sender.sendMessage(Component.text("  Trinity Dihrama", NamedTextColor.YELLOW).append(Component.text("  (dihrama)", NamedTextColor.GRAY)));
+                sender.sendMessage(Component.text("  AK-47 Magazine", NamedTextColor.YELLOW).append(Component.text("  (magazine)", NamedTextColor.GRAY)));
+                sender.sendMessage(Component.text("  Empty AK-47 Magazine", NamedTextColor.YELLOW).append(Component.text("  (empty_magazine)", NamedTextColor.GRAY)));
             }
             case "reload" -> {
                 plugin.reload();
@@ -76,8 +80,8 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
         String name = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
         // the two non-weapon items: /weapon give <player> magazine [amount]  and  /weapon give <player> dihrama [amount]
         String[] parts = name.trim().split("\\s+");
-        String first = parts[0].toLowerCase(Locale.ROOT);
-        if (first.equals("magazine") || first.equals("ak47_magazine") || first.equals("empty_magazine") || first.equals("dihrama") || first.equals("trinity_dihrama")) {
+        String first = extraId(name);
+        if (first != null) {
             int amount = 1;
             if (parts.length > 1) {
                 try {
@@ -118,6 +122,20 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    /** The non-weapon items, matched loosely ("Trinity Dihrama", "trinity_dihrama", "dihrama", "empty magazine"...). Null = not one. */
+    private static String extraId(String raw) {
+        String n = raw.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9 _]", "").trim();
+        n = n.replaceAll("\\s+\\d+$", ""); // a trailing amount
+        n = n.replace(' ', '_').replace("ak_47", "ak47");
+        if (n.contains("dihrama")) {
+            return "dihrama";
+        }
+        if (n.contains("magazine") || n.equals("mag")) {
+            return n.contains("empty") ? "empty_magazine" : "magazine";
+        }
+        return null;
+    }
+
     /** /weapon check [player]: shows why abilities might not work for someone. */
     private void check(CommandSender sender, String[] args) {
         Player target = args.length >= 2 ? Bukkit.getPlayerExact(args[1]) : (sender instanceof Player pl ? pl : null);
@@ -139,7 +157,7 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
 
     private void usage(CommandSender sender, String label) {
         sender.sendMessage(Component.text("Usage:", NamedTextColor.GOLD));
-        sender.sendMessage(Component.text("  /" + label + " give <player> <weapon>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("  /" + label + " give <player> <weapon|dihrama|magazine|empty_magazine> [amount]", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("  /" + label + " list", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("  /" + label + " reload", NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("  /" + label + " check [player]", NamedTextColor.YELLOW));
@@ -173,7 +191,7 @@ final class WeaponCommand implements CommandExecutor, TabCompleter {
                     out.add(t.id());
                 }
             }
-            for (String extra : List.of("magazine", "empty_magazine", "dihrama")) {
+            for (String extra : List.of("dihrama", "trinity_dihrama", "magazine", "empty_magazine")) {
                 if (extra.startsWith(args[2].toLowerCase(Locale.ROOT))) {
                     out.add(extra);
                 }

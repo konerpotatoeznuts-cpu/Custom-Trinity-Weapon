@@ -10,9 +10,13 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -22,8 +26,118 @@ final class MaceAbility extends Ability {
     private static final Color PURPLE = Color.fromRGB(150, 60, 220);
     private static final Color DEEP = Color.fromRGB(70, 20, 130);
 
+    /** A wielder's running combo: hits in a row without stopping (too long between hits) or falling (standing on the ground). */
+    private static final class Combo {
+        int streak;
+        long lastHit;
+        long lastStun;
+        int groundTicks;
+        UUID lastTarget;
+    }
+
+    private final Map<UUID, Combo> combos = new HashMap<>();
+
     MaceAbility(WeaponsPlugin plugin) {
         super(plugin);
+        plugin.getServer().getPluginManager().registerEvents(new Swings(), plugin);
+    }
+
+    private int streak(Player p) {
+        Combo c = combos.get(p.getUniqueId());
+        return c == null ? 0 : c.streak;
+    }
+
+    @Override
+    void onQuit(Player p) {
+        combos.remove(p.getUniqueId());
+    }
+
+    @Override
+    void tick(Player p, ItemStack held) {
+        Combo c = combos.get(p.getUniqueId());
+        if (c == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (p.isOnGround() || p.isInWater()) {
+            c.groundTicks += 2;
+        } else {
+            c.groundTicks = 0;
+        }
+        if (p.isDead() || now - c.lastHit > num("combo-window", 3.0) * 1000
+                || c.groundTicks > num("combo-ground-seconds", 1.0) * 20) {
+            if (c.streak >= 3) {
+                p.sendActionBar(net.kyori.adventure.text.Component.text("Combo lost  (" + c.streak + " hits)",
+                        net.kyori.adventure.text.format.NamedTextColor.GRAY));
+            }
+            combos.remove(p.getUniqueId());
+            return;
+        }
+        // 10+ hits: sneak mid-air to dive
+        if (held != null && c.streak >= (int) num("combo-dive-hits", 10) && p.isSneaking() && !p.isOnGround() && !p.isGliding()
+                && !p.isInWater() && allowed(p)) {
+            Vector v = p.getVelocity();
+            double fall = num("combo-dive-speed", 2.2);
+            if (v.getY() > -fall) {
+                v.setY(Math.max(-fall, v.getY() - 0.6));
+                p.setVelocity(v);
+            }
+            Location l = p.getLocation().add(0, 1.0, 0);
+            Fx.dust(l, PURPLE, 1.4f, 4, 0.25);
+            Fx.burst(l, Particle.SOUL_FIRE_FLAME, 2, 0.2, 0.02);
+        }
+    }
+
+    /** A swing that looks like a miss still connects when it is close: the longer the combo, the wider the net. */
+    private final class Swings implements org.bukkit.event.Listener {
+        @org.bukkit.event.EventHandler
+        public void onSwing(org.bukkit.event.player.PlayerAnimationEvent e) {
+            Player p = e.getPlayer();
+            Combo c = combos.get(p.getUniqueId());
+            if (c == null || c.streak < 1 || e.getAnimationType() != org.bukkit.event.player.PlayerAnimationType.ARM_SWING
+                    || plugin.items().identify(p.getInventory().getItemInMainHand()) != type()) {
+                return;
+            }
+            final long swung = System.currentTimeMillis();
+            later(() -> assist(p, swung));
+        }
+    }
+
+    private void assist(Player p, long swung) {
+        Combo c = combos.get(p.getUniqueId());
+        if (c == null || !p.isOnline() || c.lastHit >= swung - 50 || plugin.stun().isStunned(p)
+                || plugin.items().identify(p.getInventory().getItemInMainHand()) != type() || !plugin.protection().canUse(p)) {
+            return; // a real hit already landed with this swing
+        }
+        int n = Math.min(c.streak, (int) num("combo-assist-max-hits", 12));
+        double reach = num("combo-reach", 3.0) + n * num("combo-reach-per-hit", 0.2);
+        double cone = Math.toRadians(num("combo-cone", 8.0) + n * num("combo-cone-per-hit", 2.5));
+        Location eye = p.getEyeLocation();
+        Vector look = eye.getDirection().normalize();
+        LivingEntity best = null;
+        double bestAngle = cone;
+        for (LivingEntity le : Combat.nearby(plugin, p, eye, reach + 1.0)) {
+            Location at = le.getLocation().add(0, le.getHeight() / 2.0, 0);
+            Vector to = at.toVector().subtract(eye.toVector());
+            double dist = to.length() - le.getWidth() / 2.0;
+            if (dist > reach || to.lengthSquared() < 1.0E-4) {
+                continue;
+            }
+            double angle = look.angle(to.normalize());
+            if (angle >= bestAngle) {
+                continue;
+            }
+            RayTraceResult wall = p.getWorld().rayTraceBlocks(eye, to.clone().normalize(), Math.max(0.1, dist), org.bukkit.FluidCollisionMode.NEVER, true);
+            if (wall != null) {
+                continue;
+            }
+            best = le;
+            bestAngle = angle;
+        }
+        if (best != null) {
+            p.attack(best);
+            Fx.burst(best.getLocation().add(0, best.getHeight() / 2.0, 0), Particle.REVERSE_PORTAL, 6, 0.3, 0.2);
+        }
     }
 
     @Override
@@ -35,20 +149,58 @@ final class MaceAbility extends Ability {
 
     @Override
     void onHit(Player p, LivingEntity target, ItemStack item, EntityDamageByEntityEvent e) {
+        if (!allowed(p)) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Combo c = combos.computeIfAbsent(p.getUniqueId(), k -> new Combo());
+        if (now - c.lastHit > num("combo-window", 3.0) * 1000) {
+            c.streak = 0;
+        }
+        c.streak++;
+        c.lastHit = now;
+        c.groundTicks = 0;
+        c.lastTarget = target.getUniqueId();
+        int s = c.streak;
+        int bigAt = (int) num("combo-big-hits", 3);
+        int stunAt = (int) num("combo-stun-hits", 7);
+        int diveAt = (int) num("combo-dive-hits", 10);
+        if (s >= 2) {
+            String tag = s >= diveAt ? "  DIVE READY (sneak in the air)" : s >= stunAt ? "  STUN" : s >= bigAt ? "  BIGGER SMASH" : "";
+            p.sendActionBar(net.kyori.adventure.text.Component.text("Combo x" + s + tag,
+                    s >= diveAt ? net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE : net.kyori.adventure.text.format.NamedTextColor.DARK_PURPLE));
+        }
+        if (s == bigAt || s == stunAt || s == diveAt) {
+            Fx.sound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.4f, s == diveAt ? 1.9f : 1.3f);
+            Fx.burst(p.getLocation().add(0, 1.0, 0), Particle.WITCH, 20, 0.5, 0.2);
+        }
+        // 7+ hits: the target is stunned (not more often than the stun cooldown)
+        if (s >= stunAt && now - c.lastStun >= num("combo-stun-cooldown", 4.0) * 1000) {
+            c.lastStun = now;
+            final int ticks = (int) (num("combo-stun-seconds", 1.5) * 20);
+            later(() -> {
+                if (target.isValid() && !target.isDead()) {
+                    plugin.stun().stun(target, ticks, Stun.Style.SHOCK);
+                    Fx.burst(target.getLocation().add(0, target.getHeight() / 2.0, 0), Particle.ELECTRIC_SPARK, 25, 0.4, 0.3);
+                    Fx.sound(target.getLocation(), Sound.ENTITY_WARDEN_SONIC_CHARGE, 0.8f, 1.6f);
+                }
+            });
+        }
+
         // Only a real smash attack (falling onto the target) can cause a shockwave
         if (p.getFallDistance() <= (float) num("smash-min-fall", 1.5) || p.isGliding()) {
             return;
         }
-        if (ThreadLocalRandom.current().nextDouble() >= num("proc-chance", 0.4)) {
+        boolean big = s >= bigAt;
+        double chance = num("proc-chance", 0.4) + (big ? num("combo-proc-bonus", 0.3) : 0.0);
+        if (ThreadLocalRandom.current().nextDouble() >= chance) {
             return;
         }
-        if (!allowed(p)) {
-            return;
-        }
-        later(() -> shockwave(p, target));
+        final boolean bigger = big;
+        later(() -> shockwave(p, target, bigger));
     }
 
-    private void shockwave(Player p, LivingEntity center) {
+    private void shockwave(Player p, LivingEntity center, boolean bigger) {
         if (!center.isValid() || !p.isOnline()) {
             return;
         }
@@ -78,7 +230,8 @@ final class MaceAbility extends Ability {
 
         // terrain damage: a small crater under the impact
         if (plugin.getConfig().getBoolean("weapons.eldritch_mace.crater", true)) {
-            Terrain.crater(p, c, num("crater-radius", 2.5), (int) num("crater-max-blocks", 40), num("crater-max-hardness", 30));
+            double scale = bigger ? num("combo-crater-scale", 1.5) : 1.0;
+            Terrain.crater(p, c, num("crater-radius", 2.5) * scale, (int) (num("crater-max-blocks", 40) * scale * scale), num("crater-max-hardness", 30));
         }
 
         new BukkitRunnable() {
