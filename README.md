@@ -128,3 +128,24 @@ Particles, sounds and effects are exactly as before, but cheaper to send: one pl
 ## Bullets
 
 Java players see a real 3D bullet model fly down AK-47 and revolver shots (resource pack, `bullets:` in config), and bullets leave holes in walls that fade after 25 seconds (`bullet-holes:`). Bedrock keeps the particle tracer and sees dark specks for holes.
+
+## Pilot camera (Cryo Tempest, Java)
+The camera now rides an invisible seat that follows the arrow, so your mouse aims normally. Your body is hidden and
+invulnerable while a decoy stands where you were. Tune the camera height with `pilot-camera-offset`.
+
+## Trident riptide smash
+Plain tridents get the mace smash ONLY while riptiding. Bonus damage grows with the height above ground/water
+(`trident-smash:` in config).
+
+## Eldritch Mace combo
+Hits in a row (a pause longer than `combo-window`, or standing on the ground for a second, ends it) widen the reach and aim cone
+of your swings, so near-misses connect. 3 hits: bigger crater and more shockwave chance. 7 hits: stuns the target 1.5 s.
+10 hits: sneak mid-air to dive.
+
+## Excalibur: Ground Slash
+Double sneak at least 4 blocks up: slam down for damage, a 2 s stun and a 20 s bleed (more damage the more hits the victim takes) and
+a blood trail. 30 s cooldown.
+
+## Items in /weapon give
+`/weapon give <player> dihrama|magazine|empty_magazine [amount]` (also listed by `/weapon list`).
+Placeholders: `resourcepack-placeholders` (Java) and `bedrock-placeholders` (Bedrock) already include the Trinity Dihrama.
